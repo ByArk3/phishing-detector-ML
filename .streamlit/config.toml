@@ -1,5 +1,8 @@
-# Tema base de la app. El modo día / noche lo maneja el botón de la esquina (app.py).
+# Tema de la app: modo noche
 [theme]
-base = "light"
-primaryColor = "#1D4ED8"
+base = "dark"
+primaryColor = "#60A5FA"
+backgroundColor = "#0B1120"
+secondaryBackgroundColor = "#16213A"
+textColor = "#E2E8F0"
 font = "sans-serif"

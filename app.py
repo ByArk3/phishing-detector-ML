@@ -13,32 +13,15 @@ def cargar_modelo():
 
 modelo = cargar_modelo()
 
-# modo día / noche (se guarda mientras la página esté abierta)
-if "oscuro" not in st.session_state:
-    st.session_state.oscuro = st.context.theme.type == "dark"
-
-def cambiar_modo():
-    st.session_state.oscuro = not st.session_state.oscuro
-
-# colores de cada modo
-if st.session_state.oscuro:
-    c = {"fondo": "radial-gradient(circle at 15% 0%, #1E1B4B 0%, #0B1120 45%)",
-         "fondo2": "linear-gradient(180deg, #111A2E 0%, #0B1120 100%)",
-         "tarjeta": "#16213A", "borde": "#26324D", "sombra": "rgba(0,0,0,0.45)",
-         "texto": "#E2E8F0", "suave": "#94A3B8", "principal": "#60A5FA", "texto_boton": "#0B1120",
-         "brillo": "rgba(96,165,250,0.35)",
-         "banner": "linear-gradient(120deg, #1E3A8A, #5B21B6, #1E3A8A)",
-         "rojo": "#F87171", "rojo_fondo": "rgba(248,113,113,0.12)",
-         "verde": "#4ADE80", "verde_fondo": "rgba(74,222,128,0.12)"}
-else:
-    c = {"fondo": "radial-gradient(circle at 15% 0%, #E0E7FF 0%, #F5F7FF 40%, #FFFFFF 100%)",
-         "fondo2": "linear-gradient(180deg, #EEF2FF 0%, #FFFFFF 100%)",
-         "tarjeta": "#FFFFFF", "borde": "#E0E7FF", "sombra": "rgba(30,64,175,0.10)",
-         "texto": "#0F172A", "suave": "#64748B", "principal": "#1D4ED8", "texto_boton": "#FFFFFF",
-         "brillo": "rgba(29,78,216,0.25)",
-         "banner": "linear-gradient(120deg, #1D4ED8, #7C3AED, #1D4ED8)",
-         "rojo": "#B91C1C", "rojo_fondo": "#FEF2F2",
-         "verde": "#15803D", "verde_fondo": "#F0FDF4"}
+# colores de la app (modo noche)
+c = {"fondo": "radial-gradient(circle at 15% 0%, #1E1B4B 0%, #0B1120 45%)",
+     "fondo2": "linear-gradient(180deg, #111A2E 0%, #0B1120 100%)",
+     "tarjeta": "#16213A", "borde": "#26324D", "sombra": "rgba(0,0,0,0.45)",
+     "texto": "#E2E8F0", "suave": "#94A3B8", "principal": "#60A5FA", "texto_boton": "#0B1120",
+     "brillo": "rgba(96,165,250,0.35)",
+     "banner": "linear-gradient(120deg, #1E3A8A, #5B21B6, #1E3A8A)",
+     "rojo": "#F87171", "rojo_fondo": "rgba(248,113,113,0.12)",
+     "verde": "#4ADE80", "verde_fondo": "rgba(74,222,128,0.12)"}
 
 st.markdown(f"""
 <style>
@@ -63,15 +46,6 @@ st.markdown(f"""
 .stApp button[kind="primary"]:hover {{ transform: translateY(-2px); box-shadow: 0 10px 22px {c["brillo"]}; }}
 .stApp button[kind="primary"]:active {{ transform: scale(0.97); }}
 .stApp button[kind="primary"] p {{ color: {c["texto_boton"]}; font-weight: 600; }}
-
-/* botón día / noche fijo en la esquina: el icono gira al pasar el mouse */
-.st-key-boton_modo {{ position: fixed; top: 4rem; right: 1.5rem; z-index: 999999; width: auto; }}
-.st-key-boton_modo button {{ background: {c["tarjeta"]}; color: {c["texto"]};
-    border: 1px solid {c["borde"]}; border-radius: 999px; box-shadow: 0 4px 12px {c["sombra"]};
-    transition: transform 0.2s; }}
-.st-key-boton_modo button:hover {{ transform: scale(1.06); border-color: {c["principal"]}; }}
-.st-key-boton_modo button span {{ transition: transform 0.5s; }}
-.st-key-boton_modo button:hover span {{ transform: rotate(180deg); }}
 
 /* banner del título con degradado en movimiento */
 @keyframes mover {{ 0% {{ background-position: 0% 50%; }} 50% {{ background-position: 100% 50%; }}
@@ -131,6 +105,9 @@ st.markdown(f"""
 mark.urgencia {{ background: rgba(245,158,11,0.30); color: inherit; border-radius: 4px; padding: 0 3px; }}
 mark.enlace {{ background: rgba(139,92,246,0.25); color: inherit; border-radius: 4px; padding: 0 3px; }}
 [data-testid="stExpander"] details {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; }}
+[data-testid="stExpander"] summary {{ background: {c["tarjeta"]} !important; border-radius: 14px; }}
+[data-testid="stExpander"] summary:hover {{ background: {c["borde"]} !important; }}
+[data-testid="stExpander"] summary p, [data-testid="stExpander"] summary span {{ color: {c["texto"]} !important; }}
 table.historial {{ width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 0.8rem; }}
 table.historial th {{ text-align: left; color: {c["suave"]}; font-weight: 600; border-bottom: 1px solid {c["borde"]}; padding: 0.4rem; }}
 table.historial td {{ color: {c["texto"]}; border-bottom: 1px solid {c["borde"]}; padding: 0.4rem; }}
@@ -138,13 +115,6 @@ table.historial tr:hover td {{ background: {c["brillo"]}; }}
 @media (max-width: 640px) {{ .caracts {{ grid-template-columns: repeat(2, 1fr); }} }}
 </style>
 """, unsafe_allow_html=True)
-
-# botón de la esquina: muestra el modo al que se va a cambiar
-with st.container(key="boton_modo"):
-    if st.session_state.oscuro:
-        st.button("Día", icon=":material/light_mode:", on_click=cambiar_modo)
-    else:
-        st.button("Noche", icon=":material/dark_mode:", on_click=cambiar_modo)
 
 # panel lateral con la información del modelo
 metricas = [("Accuracy", "0.9766", "Correos bien clasificados en total."),
