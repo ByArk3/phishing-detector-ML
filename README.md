@@ -62,7 +62,7 @@ Matriz de confusión: 3221 verdaderos negativos, 73 falsos positivos, 50 falsos 
 
 | Archivo | Qué hace |
 |---|---|
-| `app.py` | Aplicación web en Streamlit. Recibe el texto del correo y muestra si es phishing o legítimo, sus 6 características, las palabras de urgencia resaltadas y un historial. Tiene correos de ejemplo y una pestaña "Sobre el modelo" con las métricas y las palabras más importantes del modelo. |
+| `app.py` | Aplicación web en Streamlit: recibe el texto del correo y muestra si es phishing o legítimo. |
 | `procesamiento.py` | Funciones de limpieza del texto (`limpiar_texto`) y de las 6 características (`estructurales`), iguales a las del Colab. |
 | `modelo_phishing.joblib` | Modelo ya entrenado en el Colab (TF-IDF + características + regresión logística). |
 | `requirements.txt` | Librerías con las mismas versiones del Colab. |
@@ -70,7 +70,7 @@ Matriz de confusión: 3221 verdaderos negativos, 73 falsos positivos, 50 falsos 
 | `notebooks/Proyecto_Phishing_Colab.ipynb` | Colab completo: data-set, limpieza, entrenamiento, evaluación y creación de los archivos de la app. |
 | `pruebas/prueba_correos_nuevos.py` | Prueba el modelo guardado con 6 correos nuevos. |
 | `docs/Informe_Proyecto_Phishing.pdf` | Informe del proyecto. |
-| `docs/Plantilla_Proyecto_Aprendizaje_Estadistico.pdf` | Estructura del proyecto que pide el curso (secciones I a VII). |
+| `docs/Proyecto_Final_Aprendizaje_Estadistico.pdf` | Estructura del proyecto que pide el curso (secciones I a VII). |
 
 ---
 
