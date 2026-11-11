@@ -13,6 +13,39 @@ def cargar_modelo():
 
 modelo = cargar_modelo()
 
+# palabras con más peso en la regresión logística (coeficientes del TF-IDF)
+@st.cache_data
+def palabras_importantes():
+    pre = modelo.named_steps["preprocesador"]
+    lr = modelo.named_steps["modelo"]
+    vocab = pre.named_transformers_["tfidf"].get_feature_names_out()
+    coef = lr.coef_[0][:len(vocab)]
+    orden = coef.argsort()
+    phishing = [(vocab[i], float(coef[i])) for i in orden[::-1][:10]]
+    legitimo = [(vocab[i], float(coef[i])) for i in orden[:10]]
+    return phishing, legitimo
+
+def barras(lista, color, maximo):
+    filas = ""
+    for palabra, valor in lista:
+        filas += (f'<div class="fila-p" title="Coeficiente: {valor:+.2f}"><span class="pal">{palabra}</span>'
+                  f'<div class="pista"><div class="llena" style="width:{abs(valor) / maximo * 100:.0f}%; background:{color};"></div></div>'
+                  f'<span class="num">{valor:+.2f}</span></div>')
+    return filas
+
+def seccion_palabras():
+    phishing, legitimo = palabras_importantes()
+    maximo = max(abs(v) for _, v in phishing + legitimo)
+    st.markdown(f"""
+<p class="subtitulo">Palabras más importantes del modelo</p>
+<p class="nota">Son las palabras con el coeficiente más alto en la regresión logística. Un coeficiente positivo empuja hacia phishing y uno negativo hacia legítimo. Pasa el mouse por una barra para ver su valor.</p>
+<div class="palabras">
+<div class="col-p"><div class="tit-p" style="color:{c["rojo"]};">Más indican PHISHING</div>{barras(phishing, c["rojo"], maximo)}</div>
+<div class="col-p"><div class="tit-p" style="color:{c["verde"]};">Más indican LEGÍTIMO</div>{barras(legitimo, c["verde"], maximo)}</div>
+</div>
+<div class="leyenda-p"><b>Nota:</b> las palabras salen cortadas por el stemming (por ejemplo, "remov" viene de remove y removal). Algunas palabras de legítimo, como "enron", "linguist" o "vinc", aparecen porque muchos correos legítimos del data-set vienen de la empresa Enron y de una lista de lingüística. Es una limitación del data-set: un correo legítimo distinto a esos puede salir como phishing.</div>
+""", unsafe_allow_html=True)
+
 # colores de la app (modo noche)
 c = {"fondo": "radial-gradient(circle at 15% 0%, #1E1B4B 0%, #0B1120 45%)",
      "fondo2": "linear-gradient(180deg, #111A2E 0%, #0B1120 100%)",
@@ -121,157 +154,201 @@ table.historial th {{ text-align: left; color: {c["suave"]}; font-weight: 600; b
 table.historial td {{ color: {c["texto"]}; border-bottom: 1px solid {c["borde"]}; padding: 0.4rem; }}
 table.historial tr:hover td {{ background: {c["brillo"]}; }}
 @media (max-width: 640px) {{ .caracts {{ grid-template-columns: repeat(2, 1fr); }} }}
+.palabras {{ display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; animation: aparecer 0.6s ease-out; }}
+.col-p {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; padding: 0.9rem 1rem; box-shadow: 0 3px 10px {c["sombra"]}; }}
+.tit-p {{ font-weight: 700; margin-bottom: 0.6rem; letter-spacing: 0.5px; }}
+.fila-p {{ display: grid; grid-template-columns: 6.5rem 1fr 3rem; align-items: center; gap: 0.5rem; padding: 0.22rem 0.3rem; border-radius: 8px; transition: background 0.2s; }}
+.fila-p:hover {{ background: {c["brillo"]}; }}
+.pal {{ font-size: 0.85rem; color: {c["texto"]}; font-family: monospace; }}
+.pista {{ height: 10px; background: {c["borde"]}; border-radius: 999px; overflow: hidden; }}
+.llena {{ height: 100%; border-radius: 999px; animation: llenar 1.2s ease-out; }}
+.num {{ font-size: 0.78rem; color: {c["suave"]}; text-align: right; }}
+.leyenda-p {{ margin-top: 0.9rem; padding: 0.7rem 0.9rem; font-size: 0.8rem; color: {c["suave"]}; background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-left: 4px solid {c["principal"]}; border-radius: 10px; }}
+.stTabs [data-baseweb="tab-list"] {{ gap: 0.4rem; }}
+.stTabs [data-baseweb="tab"] {{ background: {c["tarjeta"]}; border-radius: 10px 10px 0 0; padding: 0.4rem 1rem; }}
+.stTabs [data-baseweb="tab"] p {{ font-weight: 600; }}
+@media (max-width: 640px) {{ .palabras {{ grid-template-columns: 1fr; }} }}
+.metricas-3 {{ grid-template-columns: repeat(3, 1fr) !important; }}
+.info-modelo {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; padding: 0.8rem 1rem; line-height: 1.7; }}
+/* banner con ícono */
+.banner {{ display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; position: relative; overflow: hidden; }}
+.banner .escudo {{ flex-shrink: 0; width: 92px; height: 92px; animation: flotar 4s ease-in-out infinite; filter: drop-shadow(0 8px 18px rgba(0,0,0,0.35)); }}
+@keyframes flotar {{ 0%, 100% {{ transform: translateY(0); }} 50% {{ transform: translateY(-8px); }} }}
+.banner .etiqueta {{ display: inline-block; font-size: 0.72rem; font-weight: 600; letter-spacing: 1px; color: #E0E7FF;
+    background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.25); border-radius: 999px; padding: 0.15rem 0.7rem; margin-bottom: 0.6rem; }}
+/* franja de cifras principales */
+.kpis {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem; align-items: start; margin: -0.4rem 0 1.4rem 0; }}
+.kpi {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 16px; padding: 0.9rem 1rem; text-align: center;
+    box-shadow: 0 6px 18px {c["sombra"]}; transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s; animation: aparecer 0.6s ease-out both; }}
+.kpi:nth-child(2) {{ animation-delay: 0.1s; }} .kpi:nth-child(3) {{ animation-delay: 0.2s; }} .kpi:nth-child(4) {{ animation-delay: 0.3s; }}
+.kpi:hover {{ transform: translateY(-4px); border-color: {c["principal"]}; box-shadow: 0 12px 26px {c["brillo"]}; }}
+.kpi .grande {{ font-size: 1.7rem; font-weight: 700; background: linear-gradient(90deg, #60A5FA, #A78BFA);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }}
+.kpi .chico {{ font-size: 0.75rem; color: {c["suave"]}; }}
+.kpi .info {{ font-size: 0.72rem; color: {c["texto"]}; max-height: 0; opacity: 0; overflow: hidden;
+    transition: max-height 0.35s, opacity 0.35s, margin 0.35s; }}
+.kpi:hover .info {{ max-height: 4rem; opacity: 1; margin-top: 0.4rem; }}
+@media (max-width: 640px) {{ .kpis {{ grid-template-columns: repeat(2, 1fr); }} .banner .escudo {{ display: none; }} }}
 </style>
 """, unsafe_allow_html=True)
 
-# panel lateral con la información del modelo
+# métricas oficiales
 metricas = [("Accuracy", "0.9766", "Correos bien clasificados en total."),
             ("Precision", "0.9633", "De los marcados como phishing, cuántos sí lo eran."),
             ("Recall", "0.9746", "De los phishing reales, cuántos detectó."),
             ("F1-score", "0.9689", "Equilibrio entre precision y recall."),
             ("Falsos positivos", "0.0222", "Correos legítimos marcados como phishing."),
             ("AUC", "0.997", "Qué tan bien separa las dos clases (1 es perfecto).")]
-with st.sidebar:
-    st.header("Sobre el modelo")
-    st.write("**Data-set:** Phishing Email Detection (Kaggle), 17 536 correos después de la limpieza.")
-    st.write("**Modelo:** regresión logística con TF-IDF (5000 términos) y 6 características del texto.")
-    st.write("**Resultados en la prueba (5 261 correos):**")
-    st.caption("Pasa el mouse por una tarjeta para ver qué significa.")
-    tarjetas = "".join(f'<div class="metrica"><div class="valor">{v}</div><div class="nombre">{n}</div>'
-                       f'<div class="info">{d}</div></div>' for n, v, d in metricas)
-    st.markdown(f'<div class="metricas">{tarjetas}</div>', unsafe_allow_html=True)
+tarjetas = "".join(f'<div class="metrica"><div class="valor">{v}</div><div class="nombre">{n}</div>'
+                   f'<div class="info">{d}</div></div>' for n, v, d in metricas)
 
 st.markdown("""
 <div class="banner">
-  <h1>Detector de correos de phishing</h1>
-  <p>Pega el texto de un correo en inglés y el sistema dirá si es phishing o legítimo.</p>
+  <div>
+    <span class="etiqueta">APRENDIZAJE ESTADÍSTICO · UPAO 2026-II</span>
+    <h1>Detector de correos de phishing</h1>
+    <p>Pega el texto de un correo en inglés y el sistema dirá si es phishing o legítimo.</p>
+  </div>
+  <svg class="escudo" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2.5 4 5.5v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10v-6l-8-3Z" fill="rgba(255,255,255,0.12)"/>
+    <rect x="7.5" y="9" width="9" height="6.5" rx="1"/><path d="m7.8 9.4 4.2 3.3 4.2-3.3"/>
+  </svg>
+</div>
+<div class="kpis">
+  <div class="kpi"><div class="grande">97.7 %</div><div class="chico">de aciertos (accuracy)</div><div class="info">Correos bien clasificados en la prueba (5 261 correos).</div></div>
+  <div class="kpi"><div class="grande">0.9689</div><div class="chico">F1-score</div><div class="info">Equilibrio entre precision y recall.</div></div>
+  <div class="kpi"><div class="grande">0.997</div><div class="chico">AUC en la prueba</div><div class="info">Qué tan bien separa las dos clases (1 es perfecto).</div></div>
+  <div class="kpi"><div class="grande">17 536</div><div class="chico">correos del data-set</div><div class="info">70 % para entrenar y 30 % para probar.</div></div>
 </div>
 """, unsafe_allow_html=True)
 
-# correos de ejemplo (los mismos 6 del punto 6.2 del Colab)
-EJEMPLOS = {
-    "Reporte (legítimo)": "Hi John, attached is the report for tomorrow's meeting. Let me know if you have any questions. Thanks, Maria",
-    "Almuerzo (legítimo)": "Reminder: the team lunch was moved to Friday at 1 pm. See you there.",
-    "Profesor (legítimo)": "Hello professor, I am sending you the homework for chapter 4. Best regards, Franco",
-    "Cuenta (phishing)": "URGENT: Your account has been suspended! Verify your password immediately at http://paypa1-secure.com/login",
-    "Premio (phishing)": "Congratulations!!! You have won $1,000,000. Click here to claim your prize now: http://free-prize.win",
-    "Banco (phishing)": "Dear customer, we detected unusual activity in your bank account. Please login and confirm your details within 24 hours.",
-}
+tab1, tab2 = st.tabs(["Analizar", "Sobre el modelo"])
 
-# promedios de cada característica por clase (tabla del punto 3.2 del Colab)
-CARACTERISTICAS = [  # (columna, nombre, promedio phishing, promedio legítimo)
-    ("n_urls", "Enlaces", 0.292, 0.771),
-    ("n_caracteres", "Caracteres", 1641.607, 1848.656),
-    ("n_palabras", "Palabras", 311.555, 350.052),
-    ("prop_mayus", "Mayúsculas", 0.027, 0.022),
-    ("n_exclam", 'Signos "!"', 3.385, 0.638),
-    ("n_urgencia", "Palabras de urgencia", 1.081, 0.352),
-]
+with tab1:
+    # correos de ejemplo (los mismos 6 del punto 6.2 del Colab)
+    EJEMPLOS = {
+        "Reporte (legítimo)": "Hi John, attached is the report for tomorrow's meeting. Let me know if you have any questions. Thanks, Maria",
+        "Almuerzo (legítimo)": "Reminder: the team lunch was moved to Friday at 1 pm. See you there.",
+        "Profesor (legítimo)": "Hello professor, I am sending you the homework for chapter 4. Best regards, Franco",
+        "Cuenta (phishing)": "URGENT: Your account has been suspended! Verify your password immediately at http://paypa1-secure.com/login",
+        "Premio (phishing)": "Congratulations!!! You have won $1,000,000. Click here to claim your prize now: http://free-prize.win",
+        "Banco (phishing)": "Dear customer, we detected unusual activity in your bank account. Please login and confirm your details within 24 hours.",
+    }
 
-if "historial" not in st.session_state:
-    st.session_state.historial = []
+    # promedios de cada característica por clase (tabla del punto 3.2 del Colab)
+    CARACTERISTICAS = [  # (columna, nombre, promedio phishing, promedio legítimo)
+        ("n_urls", "Enlaces", 0.292, 0.771),
+        ("n_caracteres", "Caracteres", 1641.607, 1848.656),
+        ("n_palabras", "Palabras", 311.555, 350.052),
+        ("prop_mayus", "Mayúsculas", 0.027, 0.022),
+        ("n_exclam", 'Signos "!"', 3.385, 0.638),
+        ("n_urgencia", "Palabras de urgencia", 1.081, 0.352),
+    ]
 
-def poner_ejemplo(correo):
-    st.session_state.texto = correo
+    if "historial" not in st.session_state:
+        st.session_state.historial = []
 
-def limpiar():
-    st.session_state.texto = ""
+    def poner_ejemplo(correo):
+        st.session_state.texto = correo
 
-def formato(col, valor):
-    if col == "prop_mayus":
-        return f"{valor * 100:.1f} %"
-    if col in ("n_caracteres", "n_palabras"):
-        return f"{valor:.0f}"
-    return f"{valor:g}"
+    def limpiar():
+        st.session_state.texto = ""
 
-def resaltar(t):
-    # marca los enlaces y las palabras de urgencia dentro del correo
-    t = html.escape(t)
-    def cambiar(m):
-        tipo = "enlace" if m.group(1) else "urgencia"
-        return f'<mark class="{tipo}">{m.group(0)}</mark>'
-    t = patron_resaltar.sub(cambiar, t)
-    return t.replace("$", "&#36;").replace("\n", "<br>")
+    def formato(col, valor):
+        if col == "prop_mayus":
+            return f"{valor * 100:.1f} %"
+        if col in ("n_caracteres", "n_palabras"):
+            return f"{valor:.0f}"
+        return f"{valor:g}"
 
-def encontrados(t, patron):
-    # lista lo que encontró el modelo (con la misma regla), sin repetir y con cuántas veces aparece
-    conteo = {}
-    for x in patron.findall(t):
-        clave = x.lower()
-        if clave not in conteo:
-            conteo[clave] = [x, 0]
-        conteo[clave][1] += 1
-    lista = [f"{x} (x{n})" if n > 1 else x for x, n in conteo.values()]
-    return html.escape(", ".join(lista)) if lista else "Ninguno"
+    def resaltar(t):
+        # marca los enlaces y las palabras de urgencia dentro del correo
+        t = html.escape(t)
+        def cambiar(m):
+            tipo = "enlace" if m.group(1) else "urgencia"
+            return f'<mark class="{tipo}">{m.group(0)}</mark>'
+        t = patron_resaltar.sub(cambiar, t)
+        return t.replace("$", "&#36;").replace("\n", "<br>")
 
-patron_resaltar = re.compile(r"(http\S+|www\.\S+)|\b(" + "|".join(URGENCIA) + r")\b", re.I)
+    def encontrados(t, patron):
+        # lista lo que encontró el modelo (con la misma regla), sin repetir y con cuántas veces aparece
+        conteo = {}
+        for x in patron.findall(t):
+            clave = x.lower()
+            if clave not in conteo:
+                conteo[clave] = [x, 0]
+            conteo[clave][1] += 1
+        lista = [f"{x} (x{n})" if n > 1 else x for x, n in conteo.values()]
+        return html.escape(", ".join(lista)) if lista else "Ninguno"
 
-# 1. botones con correos de ejemplo
-st.markdown('<p class="subtitulo">Prueba con un correo de ejemplo:</p>', unsafe_allow_html=True)
-with st.container(key="ejemplos"):
-    columnas = st.columns(3)
-    for k, (nombre, correo) in enumerate(EJEMPLOS.items()):
-        columnas[k % 3].button(nombre, on_click=poner_ejemplo, args=(correo,), width="stretch")
+    patron_resaltar = re.compile(r"(http\S+|www\.\S+)|\b(" + "|".join(URGENCIA) + r")\b", re.I)
 
-texto = st.text_area("Texto del correo", height=200, key="texto",
-                     placeholder="Pega aquí el texto del correo en inglés...")
+    # 1. botones con correos de ejemplo
+    st.markdown('<p class="subtitulo">Prueba con un correo de ejemplo:</p>', unsafe_allow_html=True)
+    with st.container(key="ejemplos"):
+        columnas = st.columns(3)
+        for k, (nombre, correo) in enumerate(EJEMPLOS.items()):
+            columnas[k % 3].button(nombre, on_click=poner_ejemplo, args=(correo,), width="stretch")
 
-# 4. contador de palabras y caracteres
-st.markdown(f'<p class="contador">{len(texto.split())} palabras &middot; {len(texto)} caracteres</p>',
-            unsafe_allow_html=True)
+    texto = st.text_area("Texto del correo", height=200, key="texto",
+                         placeholder="Pega aquí el texto del correo en inglés...")
 
-col1, col2, _ = st.columns([1.2, 1, 3])
-analizar = col1.button("Analizar", type="primary", width="stretch")
-col2.button("Limpiar", on_click=limpiar, width="stretch")
+    # 4. contador de palabras y caracteres
+    st.markdown(f'<p class="contador">{len(texto.split())} palabras &middot; {len(texto)} caracteres</p>',
+                unsafe_allow_html=True)
 
-if analizar:
-    if texto.strip() == "":
-        st.warning("Primero pega el texto de un correo.")
-    else:
-        fila = pd.DataFrame([{"texto_limpio": limpiar_texto(texto), **estructurales(texto)}])
-        p = modelo.predict_proba(fila)[0, 1]          # probabilidad de phishing
-        st.session_state.ultimo = {"texto": texto, "p": p}
-        # 5. historial de la sesión
-        nuevo = {"Correo": texto[:50] + ("..." if len(texto) > 50 else ""),
-                 "Resultado": "PHISHING" if p >= 0.5 else "LEGÍTIMO",
-                 "P(phishing)": f"{p * 100:.1f} %"}
-        if not st.session_state.historial or st.session_state.historial[0] != nuevo:   # sin repetidos seguidos
-            st.session_state.historial.insert(0, nuevo)
+    col1, col2, _ = st.columns([1.2, 1, 3])
+    analizar = col1.button("Analizar", type="primary", width="stretch")
+    col2.button("Limpiar", on_click=limpiar, width="stretch")
 
-# el resultado se muestra mientras el texto no cambie
-ultimo = st.session_state.get("ultimo")
-if ultimo and ultimo["texto"] == texto and texto.strip() != "":
-    p = ultimo["p"]
-    if p >= 0.5:
-        clase, color, fondo = "PHISHING", c["rojo"], c["rojo_fondo"]
-        detalle = f"PHISHING - probabilidad: {p * 100:.1f} %"
-    else:
-        clase, color, fondo = "LEGÍTIMO", c["verde"], c["verde_fondo"]
-        detalle = f"LEGÍTIMO - probabilidad de phishing: {p * 100:.1f} %"
-    st.markdown(f"""
+    if analizar:
+        if texto.strip() == "":
+            st.warning("Primero pega el texto de un correo.")
+        else:
+            fila = pd.DataFrame([{"texto_limpio": limpiar_texto(texto), **estructurales(texto)}])
+            p = modelo.predict_proba(fila)[0, 1]          # probabilidad de phishing
+            st.session_state.ultimo = {"texto": texto, "p": p}
+            # 5. historial de la sesión
+            nuevo = {"Correo": texto[:50] + ("..." if len(texto) > 50 else ""),
+                     "Resultado": "PHISHING" if p >= 0.5 else "LEGÍTIMO",
+                     "P(phishing)": f"{p * 100:.1f} %"}
+            if not st.session_state.historial or st.session_state.historial[0] != nuevo:   # sin repetidos seguidos
+                st.session_state.historial.insert(0, nuevo)
+
+    # el resultado se muestra mientras el texto no cambie
+    ultimo = st.session_state.get("ultimo")
+    if ultimo and ultimo["texto"] == texto and texto.strip() != "":
+        p = ultimo["p"]
+        if p >= 0.5:
+            clase, color, fondo = "PHISHING", c["rojo"], c["rojo_fondo"]
+            detalle = f"PHISHING - probabilidad: {p * 100:.1f} %"
+        else:
+            clase, color, fondo = "LEGÍTIMO", c["verde"], c["verde_fondo"]
+            detalle = f"LEGÍTIMO - probabilidad de phishing: {p * 100:.1f} %"
+        st.markdown(f"""
 <div class="resultado" style="background:{fondo}; border-color:{color};">
 <div class="clase" style="color:{color};">{clase}</div>
 <p class="detalle">{detalle}</p>
 <div class="barra"><div class="relleno" style="width:{p * 100:.1f}%; background:{color};"></div><div class="umbral"></div></div>
 <div class="marcas"><span>0 %</span><span>umbral 50 %</span><span>100 %</span></div>
 </div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-    # 2. características del correo comparadas con los promedios del data-set
-    valores = estructurales(texto)
-    cajas = ""
-    for col, nombre, prom_ph, prom_leg in CARACTERISTICAS:
-        cajas += (f'<div class="caract"><div class="valor">{formato(col, valores[col])}</div>'
-                  f'<div class="nombre">{nombre}</div>'
-                  f'<div class="prom">Promedio: phishing {formato(col, prom_ph)} | legítimo {formato(col, prom_leg)}</div></div>')
-    st.markdown(f"""
+        # 2. características del correo comparadas con los promedios del data-set
+        valores = estructurales(texto)
+        cajas = ""
+        for col, nombre, prom_ph, prom_leg in CARACTERISTICAS:
+            cajas += (f'<div class="caract"><div class="valor">{formato(col, valores[col])}</div>'
+                      f'<div class="nombre">{nombre}</div>'
+                      f'<div class="prom">Promedio: phishing {formato(col, prom_ph)} | legítimo {formato(col, prom_leg)}</div></div>')
+        st.markdown(f"""
 <p class="subtitulo">Características del correo</p>
 <div class="caracts">{cajas}</div>
 <p class="nota">El modelo usa estas 6 medidas junto con las palabras del texto (TF-IDF). Debajo de cada una está el promedio de los correos del data-set.</p>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-    # 3. texto con los enlaces y las palabras de urgencia resaltados
-    st.markdown(f"""
+        # 3. texto con los enlaces y las palabras de urgencia resaltados
+        st.markdown(f"""
 <p class="subtitulo">Texto analizado</p>
 <div class="texto-marcado">{resaltar(texto)}</div>
 <table class="leyenda">
@@ -279,20 +356,30 @@ if ultimo and ultimo["texto"] == texto and texto.strip() != "":
 <tr><td><mark class="urgencia">naranja</mark></td><td>Palabras de urgencia</td><td class="cantidad">{valores["n_urgencia"]}</td><td>{encontrados(texto, patron_urg)}</td></tr>
 <tr><td><mark class="enlace">morado</mark></td><td>Enlaces</td><td class="cantidad">{valores["n_urls"]}</td><td>{encontrados(texto, patron_url)}</td></tr>
 </table>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-# 5. historial de los correos analizados
-if st.session_state.historial:
-    with st.expander(f"Historial de esta sesión ({len(st.session_state.historial)})"):
-        filas = "".join(
-            f'<tr><td>{html.escape(h["Correo"])}</td>'
-            f'<td style="color:{c["rojo"] if h["Resultado"] == "PHISHING" else c["verde"]}; font-weight:600;">{h["Resultado"]}</td>'
-            f'<td>{h["P(phishing)"]}</td></tr>' for h in st.session_state.historial)
-        st.markdown(f'<table class="historial"><tr><th>Correo</th><th>Resultado</th><th>P(phishing)</th></tr>{filas}</table>',
-                    unsafe_allow_html=True)
-        if st.button("Borrar historial"):
-            st.session_state.historial = []
-            st.rerun()
+    # 5. historial de los correos analizados
+    if st.session_state.historial:
+        with st.expander(f"Historial de esta sesión ({len(st.session_state.historial)})"):
+            filas = "".join(
+                f'<tr><td>{html.escape(h["Correo"])}</td>'
+                f'<td style="color:{c["rojo"] if h["Resultado"] == "PHISHING" else c["verde"]}; font-weight:600;">{h["Resultado"]}</td>'
+                f'<td>{h["P(phishing)"]}</td></tr>' for h in st.session_state.historial)
+            st.markdown(f'<table class="historial"><tr><th>Correo</th><th>Resultado</th><th>P(phishing)</th></tr>{filas}</table>',
+                        unsafe_allow_html=True)
+            if st.button("Borrar historial"):
+                st.session_state.historial = []
+                st.rerun()
+
+
+with tab2:
+    st.markdown(f"""
+<div class="info-modelo"><b>Data-set:</b> Phishing Email Detection (Kaggle), 17 536 correos después de la limpieza.<br>
+<b>Modelo:</b> regresión logística con TF-IDF (5000 términos) y 6 características del texto.</div>
+<p class="subtitulo">Resultados en la prueba (5 261 correos)</p>
+<div class="metricas metricas-3">{tarjetas}</div>
+""", unsafe_allow_html=True)
+    seccion_palabras()
 
 st.write("")
 st.caption("Aprendizaje Estadístico - UPAO 2026-II | Eustaquio Ávila, Marquez Rodriguez, Velásquez Revilla")
