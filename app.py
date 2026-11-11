@@ -255,7 +255,8 @@ if ultimo and ultimo["texto"] == texto and texto.strip() != "":
     st.markdown(f"""
 <p class="subtitulo">Texto analizado</p>
 <div class="texto-marcado">{resaltar(texto)}</div>
-<p class="nota"><mark class="urgencia">palabra de urgencia</mark> &nbsp; <mark class="enlace">enlace</mark></p>
+<p class="nota">Leyenda: <mark class="urgencia">naranja</mark> = palabra de urgencia ({valores["n_urgencia"]} en este correo) &nbsp;|&nbsp; <mark class="enlace">morado</mark> = enlace ({valores["n_urls"]} en este correo)</p>
+<p class="nota">Palabras de urgencia que busca el sistema: {", ".join(URGENCIA)}.</p>
 """, unsafe_allow_html=True)
 
 # 5. historial de los correos analizados
