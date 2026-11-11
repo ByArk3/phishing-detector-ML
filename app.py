@@ -1,7 +1,9 @@
+import html
+import re
 import joblib
 import pandas as pd
 import streamlit as st
-from procesamiento import limpiar_texto, estructurales
+from procesamiento import limpiar_texto, estructurales, URGENCIA
 
 st.set_page_config(page_title="Detector de phishing", layout="centered")
 
@@ -104,6 +106,36 @@ st.markdown(f"""
 .metrica .info {{ font-size: 0.7rem; color: {c["suave"]}; max-height: 0; opacity: 0; overflow: hidden;
     transition: max-height 0.35s, opacity 0.35s, margin 0.35s; }}
 .metrica:hover .info {{ max-height: 6rem; opacity: 1; margin-top: 0.35rem; }}
+/* botones de ejemplo y botón Limpiar */
+.stApp button[kind="secondary"] {{ background: {c["tarjeta"]}; color: {c["texto"]}; border: 1px solid {c["borde"]};
+    border-radius: 999px; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; }}
+.stApp button[kind="secondary"]:hover {{ transform: translateY(-2px); border-color: {c["principal"]};
+    color: {c["principal"]}; box-shadow: 0 6px 14px {c["brillo"]}; }}
+.stApp button[kind="secondary"] p {{ font-size: 0.85rem; }}
+.subtitulo {{ font-weight: 600; margin: 1.2rem 0 0.5rem 0 !important; }}
+.contador {{ font-size: 0.8rem; color: {c["suave"]} !important; text-align: right; margin-top: -0.6rem !important; }}
+.nota {{ font-size: 0.78rem; color: {c["suave"]} !important; margin-top: 0.5rem !important; }}
+
+/* tarjetas de características del correo */
+.caracts {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; animation: aparecer 0.6s ease-out; }}
+.caract {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; padding: 0.7rem 0.9rem;
+    box-shadow: 0 3px 10px {c["sombra"]}; transition: transform 0.25s, border-color 0.25s; }}
+.caract:hover {{ transform: translateY(-3px); border-color: {c["principal"]}; }}
+.caract .valor {{ font-size: 1.3rem; font-weight: 700; color: {c["principal"]}; }}
+.caract .nombre {{ font-size: 0.8rem; font-weight: 600; }}
+.caract .prom {{ font-size: 0.68rem; color: {c["suave"]}; margin-top: 0.2rem; }}
+
+/* texto con palabras resaltadas */
+.texto-marcado {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px;
+    padding: 0.9rem 1.1rem; line-height: 1.8; box-shadow: 0 3px 10px {c["sombra"]}; animation: aparecer 0.7s ease-out; }}
+mark.urgencia {{ background: rgba(245,158,11,0.30); color: inherit; border-radius: 4px; padding: 0 3px; }}
+mark.enlace {{ background: rgba(139,92,246,0.25); color: inherit; border-radius: 4px; padding: 0 3px; }}
+[data-testid="stExpander"] details {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; }}
+table.historial {{ width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 0.8rem; }}
+table.historial th {{ text-align: left; color: {c["suave"]}; font-weight: 600; border-bottom: 1px solid {c["borde"]}; padding: 0.4rem; }}
+table.historial td {{ color: {c["texto"]}; border-bottom: 1px solid {c["borde"]}; padding: 0.4rem; }}
+table.historial tr:hover td {{ background: {c["brillo"]}; }}
+@media (max-width: 640px) {{ .caracts {{ grid-template-columns: repeat(2, 1fr); }} }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -138,21 +170,96 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-texto = st.text_area("Texto del correo", height=220)
+# correos de ejemplo (los mismos 6 del punto 6.2 del Colab)
+EJEMPLOS = {
+    "Reporte (legítimo)": "Hi John, attached is the report for tomorrow's meeting. Let me know if you have any questions. Thanks, Maria",
+    "Almuerzo (legítimo)": "Reminder: the team lunch was moved to Friday at 1 pm. See you there.",
+    "Profesor (legítimo)": "Hello professor, I am sending you the homework for chapter 4. Best regards, Franco",
+    "Cuenta (phishing)": "URGENT: Your account has been suspended! Verify your password immediately at http://paypa1-secure.com/login",
+    "Premio (phishing)": "Congratulations!!! You have won $1,000,000. Click here to claim your prize now: http://free-prize.win",
+    "Banco (phishing)": "Dear customer, we detected unusual activity in your bank account. Please login and confirm your details within 24 hours.",
+}
 
-if st.button("Analizar", type="primary"):
+# promedios de cada característica por clase (tabla del punto 3.2 del Colab)
+CARACTERISTICAS = [  # (columna, nombre, promedio phishing, promedio legítimo)
+    ("n_urls", "Enlaces", 0.292, 0.771),
+    ("n_caracteres", "Caracteres", 1641.607, 1848.656),
+    ("n_palabras", "Palabras", 311.555, 350.052),
+    ("prop_mayus", "Mayúsculas", 0.027, 0.022),
+    ("n_exclam", 'Signos "!"', 3.385, 0.638),
+    ("n_urgencia", "Palabras de urgencia", 1.081, 0.352),
+]
+
+if "historial" not in st.session_state:
+    st.session_state.historial = []
+
+def poner_ejemplo(correo):
+    st.session_state.texto = correo
+
+def limpiar():
+    st.session_state.texto = ""
+
+def formato(col, valor):
+    if col == "prop_mayus":
+        return f"{valor * 100:.1f} %"
+    if col in ("n_caracteres", "n_palabras"):
+        return f"{valor:.0f}"
+    return f"{valor:g}"
+
+def resaltar(t):
+    # marca los enlaces y las palabras de urgencia dentro del correo
+    t = html.escape(t)
+    def cambiar(m):
+        tipo = "enlace" if m.group(1) else "urgencia"
+        return f'<mark class="{tipo}">{m.group(0)}</mark>'
+    t = patron_resaltar.sub(cambiar, t)
+    return t.replace("$", "&#36;").replace("\n", "<br>")
+
+patron_resaltar = re.compile(r"(http\S+|www\.\S+)|\b(" + "|".join(URGENCIA) + r")\b", re.I)
+
+# 1. botones con correos de ejemplo
+st.markdown('<p class="subtitulo">Prueba con un correo de ejemplo:</p>', unsafe_allow_html=True)
+with st.container(key="ejemplos"):
+    columnas = st.columns(3)
+    for k, (nombre, correo) in enumerate(EJEMPLOS.items()):
+        columnas[k % 3].button(nombre, on_click=poner_ejemplo, args=(correo,), width="stretch")
+
+texto = st.text_area("Texto del correo", height=200, key="texto",
+                     placeholder="Pega aquí el texto del correo en inglés...")
+
+# 4. contador de palabras y caracteres
+st.markdown(f'<p class="contador">{len(texto.split())} palabras &middot; {len(texto)} caracteres</p>',
+            unsafe_allow_html=True)
+
+col1, col2, _ = st.columns([1.2, 1, 3])
+analizar = col1.button("Analizar", type="primary", width="stretch")
+col2.button("Limpiar", on_click=limpiar, width="stretch")
+
+if analizar:
     if texto.strip() == "":
         st.warning("Primero pega el texto de un correo.")
     else:
         fila = pd.DataFrame([{"texto_limpio": limpiar_texto(texto), **estructurales(texto)}])
         p = modelo.predict_proba(fila)[0, 1]          # probabilidad de phishing
-        if p >= 0.5:
-            clase, color, fondo = "PHISHING", c["rojo"], c["rojo_fondo"]
-            detalle = f"PHISHING - probabilidad: {p * 100:.1f} %"
-        else:
-            clase, color, fondo = "LEGÍTIMO", c["verde"], c["verde_fondo"]
-            detalle = f"LEGÍTIMO - probabilidad de phishing: {p * 100:.1f} %"
-        st.markdown(f"""
+        st.session_state.ultimo = {"texto": texto, "p": p}
+        # 5. historial de la sesión
+        nuevo = {"Correo": texto[:50] + ("..." if len(texto) > 50 else ""),
+                 "Resultado": "PHISHING" if p >= 0.5 else "LEGÍTIMO",
+                 "P(phishing)": f"{p * 100:.1f} %"}
+        if not st.session_state.historial or st.session_state.historial[0] != nuevo:   # sin repetidos seguidos
+            st.session_state.historial.insert(0, nuevo)
+
+# el resultado se muestra mientras el texto no cambie
+ultimo = st.session_state.get("ultimo")
+if ultimo and ultimo["texto"] == texto and texto.strip() != "":
+    p = ultimo["p"]
+    if p >= 0.5:
+        clase, color, fondo = "PHISHING", c["rojo"], c["rojo_fondo"]
+        detalle = f"PHISHING - probabilidad: {p * 100:.1f} %"
+    else:
+        clase, color, fondo = "LEGÍTIMO", c["verde"], c["verde_fondo"]
+        detalle = f"LEGÍTIMO - probabilidad de phishing: {p * 100:.1f} %"
+    st.markdown(f"""
 <div class="resultado" style="background:{fondo}; border-color:{color};">
 <div class="clase" style="color:{color};">{clase}</div>
 <p class="detalle">{detalle}</p>
@@ -160,6 +267,39 @@ if st.button("Analizar", type="primary"):
 <div class="marcas"><span>0 %</span><span>umbral 50 %</span><span>100 %</span></div>
 </div>
 """, unsafe_allow_html=True)
+
+    # 2. características del correo comparadas con los promedios del data-set
+    valores = estructurales(texto)
+    cajas = ""
+    for col, nombre, prom_ph, prom_leg in CARACTERISTICAS:
+        cajas += (f'<div class="caract"><div class="valor">{formato(col, valores[col])}</div>'
+                  f'<div class="nombre">{nombre}</div>'
+                  f'<div class="prom">Promedio: phishing {formato(col, prom_ph)} | legítimo {formato(col, prom_leg)}</div></div>')
+    st.markdown(f"""
+<p class="subtitulo">Características del correo</p>
+<div class="caracts">{cajas}</div>
+<p class="nota">El modelo usa estas 6 medidas junto con las palabras del texto (TF-IDF). Debajo de cada una está el promedio de los correos del data-set.</p>
+""", unsafe_allow_html=True)
+
+    # 3. texto con los enlaces y las palabras de urgencia resaltados
+    st.markdown(f"""
+<p class="subtitulo">Texto analizado</p>
+<div class="texto-marcado">{resaltar(texto)}</div>
+<p class="nota"><mark class="urgencia">palabra de urgencia</mark> &nbsp; <mark class="enlace">enlace</mark></p>
+""", unsafe_allow_html=True)
+
+# 5. historial de los correos analizados
+if st.session_state.historial:
+    with st.expander(f"Historial de esta sesión ({len(st.session_state.historial)})"):
+        filas = "".join(
+            f'<tr><td>{html.escape(h["Correo"])}</td>'
+            f'<td style="color:{c["rojo"] if h["Resultado"] == "PHISHING" else c["verde"]}; font-weight:600;">{h["Resultado"]}</td>'
+            f'<td>{h["P(phishing)"]}</td></tr>' for h in st.session_state.historial)
+        st.markdown(f'<table class="historial"><tr><th>Correo</th><th>Resultado</th><th>P(phishing)</th></tr>{filas}</table>',
+                    unsafe_allow_html=True)
+        if st.button("Borrar historial"):
+            st.session_state.historial = []
+            st.rerun()
 
 st.write("")
 st.caption("Aprendizaje Estadístico - UPAO 2026-II | Eustaquio Ávila, Marquez Rodriguez, Velásquez Revilla")
