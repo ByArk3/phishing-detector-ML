@@ -104,4 +104,4 @@ Probamos el sistema con 6 correos escritos por nosotros, que no están en el dat
 El sistema acierta 5 de 6. El correo "Hello professor..." es legítimo pero sale como phishing. Lo dejamos tal cual porque es un resultado real del modelo y muestra una de sus limitaciones.
 
 ### Aplicación publicada
-La app está publicada en Streamlit Community Cloud: [ENLACE DE LA APP]
+La app está publicada en Streamlit Community Cloud: https://detector-phishing-ml.streamlit.app
