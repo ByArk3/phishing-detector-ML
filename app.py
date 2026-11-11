@@ -3,7 +3,7 @@ import re
 import joblib
 import pandas as pd
 import streamlit as st
-from procesamiento import limpiar_texto, estructurales, URGENCIA
+from procesamiento import limpiar_texto, estructurales, URGENCIA, patron_url, patron_urg
 
 st.set_page_config(page_title="Detector de phishing", layout="centered")
 
@@ -102,8 +102,14 @@ st.markdown(f"""
 /* texto con palabras resaltadas */
 .texto-marcado {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px;
     padding: 0.9rem 1.1rem; line-height: 1.8; box-shadow: 0 3px 10px {c["sombra"]}; animation: aparecer 0.7s ease-out; }}
-.leyenda {{ display: inline-block; margin-top: 0.7rem; padding: 0.5rem 0.9rem; font-size: 0.8rem;
-    color: {c["suave"]}; background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 10px; }}
+.leyenda {{ width: 100%; margin-top: 0.8rem; border-collapse: separate; border-spacing: 0; font-size: 0.85rem;
+    background: {c["tarjeta"]}; border: 1px solid {c["principal"]}; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 0 0 3px {c["brillo"]}, 0 8px 22px {c["sombra"]}; animation: aparecer 0.8s ease-out; }}
+.leyenda th {{ text-align: left; padding: 0.55rem 0.8rem; color: {c["texto"]}; font-weight: 600;
+    background: linear-gradient(90deg, rgba(30,58,138,0.55), rgba(91,33,182,0.55)); }}
+.leyenda td {{ padding: 0.55rem 0.8rem; color: {c["texto"]}; border-top: 1px solid {c["borde"]}; word-break: break-word; }}
+.leyenda tr:hover td {{ background: {c["brillo"]}; }}
+.leyenda .cantidad {{ font-size: 1.1rem; font-weight: 700; color: {c["principal"]}; text-align: center; }}
 mark.urgencia {{ background: rgba(245,158,11,0.30); color: inherit; border-radius: 4px; padding: 0 3px; }}
 mark.enlace {{ background: rgba(139,92,246,0.25); color: inherit; border-radius: 4px; padding: 0 3px; }}
 [data-testid="stExpander"] details {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; }}
@@ -187,6 +193,17 @@ def resaltar(t):
     t = patron_resaltar.sub(cambiar, t)
     return t.replace("$", "&#36;").replace("\n", "<br>")
 
+def encontrados(t, patron):
+    # lista lo que encontró el modelo (con la misma regla), sin repetir y con cuántas veces aparece
+    conteo = {}
+    for x in patron.findall(t):
+        clave = x.lower()
+        if clave not in conteo:
+            conteo[clave] = [x, 0]
+        conteo[clave][1] += 1
+    lista = [f"{x} (x{n})" if n > 1 else x for x, n in conteo.values()]
+    return html.escape(", ".join(lista)) if lista else "Ninguno"
+
 patron_resaltar = re.compile(r"(http\S+|www\.\S+)|\b(" + "|".join(URGENCIA) + r")\b", re.I)
 
 # 1. botones con correos de ejemplo
@@ -257,7 +274,11 @@ if ultimo and ultimo["texto"] == texto and texto.strip() != "":
     st.markdown(f"""
 <p class="subtitulo">Texto analizado</p>
 <div class="texto-marcado">{resaltar(texto)}</div>
-<div class="leyenda"><mark class="urgencia">naranja</mark> = palabra de urgencia ({valores["n_urgencia"]} en este correo) &nbsp;|&nbsp; <mark class="enlace">morado</mark> = enlace ({valores["n_urls"]} en este correo)</div>
+<table class="leyenda">
+<tr><th>Color</th><th>Qué marca</th><th>Cantidad</th><th>Encontrado en el correo</th></tr>
+<tr><td><mark class="urgencia">naranja</mark></td><td>Palabras de urgencia</td><td class="cantidad">{valores["n_urgencia"]}</td><td>{encontrados(texto, patron_urg)}</td></tr>
+<tr><td><mark class="enlace">morado</mark></td><td>Enlaces</td><td class="cantidad">{valores["n_urls"]}</td><td>{encontrados(texto, patron_url)}</td></tr>
+</table>
 """, unsafe_allow_html=True)
 
 # 5. historial de los correos analizados
