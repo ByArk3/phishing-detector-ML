@@ -1,7 +1,22 @@
+# Colores de la app en modo día (claro) y modo noche (oscuro).
+# El modo se elige en el menú de la app: ⋮ > Settings > Theme.
+
 [theme]
-base = "light"
-primaryColor = "#1F4E79"
+font = "sans-serif"
+baseRadius = "medium"
+
+[theme.light]
+primaryColor = "#1D4ED8"
 backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F0F3F7"
-textColor = "#1A1A1A"
-font = "sans serif"
+secondaryBackgroundColor = "#F1F5F9"
+textColor = "#0F172A"
+redColor = "#B91C1C"
+greenColor = "#15803D"
+
+[theme.dark]
+primaryColor = "#60A5FA"
+backgroundColor = "#0F172A"
+secondaryBackgroundColor = "#1E293B"
+textColor = "#E2E8F0"
+redColor = "#F87171"
+greenColor = "#4ADE80"
