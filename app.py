@@ -7,23 +7,96 @@ from procesamiento import limpiar_texto, estructurales, URGENCIA, patron_url, pa
 
 st.set_page_config(page_title="Detector de phishing", layout="centered")
 
+# ---------- datos fijos ----------
+
+# colores de la app (modo noche)
+c = {"fondo": "radial-gradient(circle at 15% 0%, #1E1B4B 0%, #0B1120 45%)",
+     "tarjeta": "#16213A", "borde": "#26324D", "sombra": "rgba(0,0,0,0.45)",
+     "texto": "#E2E8F0", "suave": "#94A3B8", "principal": "#60A5FA", "texto_boton": "#0B1120",
+     "brillo": "rgba(96,165,250,0.35)",
+     "banner": "linear-gradient(120deg, #1E3A8A, #5B21B6, #1E3A8A)",
+     "rojo": "#F87171", "rojo_fondo": "rgba(248,113,113,0.12)",
+     "verde": "#4ADE80", "verde_fondo": "rgba(74,222,128,0.12)"}
+
+# métricas oficiales del Colab (conjunto de prueba)
+METRICAS = [("Accuracy", "0.9766", "Correos bien clasificados en total."),
+            ("Precision", "0.9633", "De los marcados como phishing, cuántos sí lo eran."),
+            ("Recall", "0.9746", "De los phishing reales, cuántos detectó."),
+            ("F1-score", "0.9689", "Equilibrio entre precision y recall."),
+            ("Falsos positivos", "0.0222", "Correos legítimos marcados como phishing."),
+            ("AUC", "0.997", "Qué tan bien separa las dos clases (1 es perfecto).")]
+
+# correos de ejemplo (los mismos 6 del punto 6.2 del Colab)
+EJEMPLOS = {
+    "Reporte (legítimo)": "Hi John, attached is the report for tomorrow's meeting. Let me know if you have any questions. Thanks, Maria",
+    "Almuerzo (legítimo)": "Reminder: the team lunch was moved to Friday at 1 pm. See you there.",
+    "Profesor (legítimo)": "Hello professor, I am sending you the homework for chapter 4. Best regards, Franco",
+    "Cuenta (phishing)": "URGENT: Your account has been suspended! Verify your password immediately at http://paypa1-secure.com/login",
+    "Premio (phishing)": "Congratulations!!! You have won $1,000,000. Click here to claim your prize now: http://free-prize.win",
+    "Banco (phishing)": "Dear customer, we detected unusual activity in your bank account. Please login and confirm your details within 24 hours.",
+}
+
+# promedios de cada característica por clase (tabla del punto 3.2 del Colab)
+CARACTERISTICAS = [  # (columna, nombre, promedio phishing, promedio legítimo)
+    ("n_urls", "Enlaces", 0.292, 0.771),
+    ("n_caracteres", "Caracteres", 1641.607, 1848.656),
+    ("n_palabras", "Palabras", 311.555, 350.052),
+    ("prop_mayus", "Mayúsculas", 0.027, 0.022),
+    ("n_exclam", 'Signos "!"', 3.385, 0.638),
+    ("n_urgencia", "Palabras de urgencia", 1.081, 0.352),
+]
+
+# enlaces (grupo 1) o palabras de urgencia (grupo 2), para resaltarlos en el texto
+patron_resaltar = re.compile(r"(http\S+|www\.\S+)|\b(" + "|".join(URGENCIA) + r")\b", re.I)
+
+# ---------- modelo ----------
+
 @st.cache_resource
 def cargar_modelo():
     return joblib.load("modelo_phishing.joblib")
 
 modelo = cargar_modelo()
 
-# palabras con más peso en la regresión logística (coeficientes del TF-IDF)
 @st.cache_data
 def palabras_importantes():
-    pre = modelo.named_steps["preprocesador"]
-    lr = modelo.named_steps["modelo"]
-    vocab = pre.named_transformers_["tfidf"].get_feature_names_out()
-    coef = lr.coef_[0][:len(vocab)]
+    # palabras con más peso en la regresión logística (coeficientes del TF-IDF)
+    vocab = modelo.named_steps["preprocesador"].named_transformers_["tfidf"].get_feature_names_out()
+    coef = modelo.named_steps["modelo"].coef_[0][:len(vocab)]
     orden = coef.argsort()
     phishing = [(vocab[i], float(coef[i])) for i in orden[::-1][:10]]
     legitimo = [(vocab[i], float(coef[i])) for i in orden[:10]]
     return phishing, legitimo
+
+# ---------- funciones de apoyo ----------
+
+def poner_ejemplo(correo):
+    st.session_state.texto = correo
+
+def limpiar():
+    st.session_state.texto = ""
+
+def formato(col, valor):
+    if col == "prop_mayus":
+        return f"{valor * 100:.1f} %"
+    if col in ("n_caracteres", "n_palabras"):
+        return f"{valor:.0f}"
+    return f"{valor:g}"
+
+def resaltar(t):
+    # marca los enlaces y las palabras de urgencia dentro del correo
+    def cambiar(m):
+        tipo = "enlace" if m.group(1) else "urgencia"
+        return f'<mark class="{tipo}">{m.group(0)}</mark>'
+    t = patron_resaltar.sub(cambiar, html.escape(t))
+    return t.replace("$", "&#36;").replace("\n", "<br>")
+
+def encontrados(t, patron):
+    # lo que encontró el modelo (con la misma regla), sin repetir y con cuántas veces aparece
+    conteo = {}
+    for x in patron.findall(t):
+        conteo.setdefault(x.lower(), [x, 0])[1] += 1
+    lista = [f"{x} (x{n})" if n > 1 else x for x, n in conteo.values()]
+    return html.escape(", ".join(lista)) if lista else "Ninguno"
 
 def barras(lista, color, maximo):
     filas = ""
@@ -33,28 +106,7 @@ def barras(lista, color, maximo):
                   f'<span class="num">{valor:+.2f}</span></div>')
     return filas
 
-def seccion_palabras():
-    phishing, legitimo = palabras_importantes()
-    maximo = max(abs(v) for _, v in phishing + legitimo)
-    st.markdown(f"""
-<p class="subtitulo">Palabras más importantes del modelo</p>
-<p class="nota">Son las palabras con el coeficiente más alto en la regresión logística. Un coeficiente positivo empuja hacia phishing y uno negativo hacia legítimo. Pasa el mouse por una barra para ver su valor.</p>
-<div class="palabras">
-<div class="col-p"><div class="tit-p" style="color:{c["rojo"]};">Más indican PHISHING</div>{barras(phishing, c["rojo"], maximo)}</div>
-<div class="col-p"><div class="tit-p" style="color:{c["verde"]};">Más indican LEGÍTIMO</div>{barras(legitimo, c["verde"], maximo)}</div>
-</div>
-<div class="leyenda-p"><b>Nota:</b> las palabras salen cortadas por el stemming (por ejemplo, "remov" viene de remove y removal). Algunas palabras de legítimo, como "enron", "linguist" o "vinc", aparecen porque muchos correos legítimos del data-set vienen de la empresa Enron y de una lista de lingüística. Es una limitación del data-set: un correo legítimo distinto a esos puede salir como phishing.</div>
-""", unsafe_allow_html=True)
-
-# colores de la app (modo noche)
-c = {"fondo": "radial-gradient(circle at 15% 0%, #1E1B4B 0%, #0B1120 45%)",
-     "fondo2": "linear-gradient(180deg, #111A2E 0%, #0B1120 100%)",
-     "tarjeta": "#16213A", "borde": "#26324D", "sombra": "rgba(0,0,0,0.45)",
-     "texto": "#E2E8F0", "suave": "#94A3B8", "principal": "#60A5FA", "texto_boton": "#0B1120",
-     "brillo": "rgba(96,165,250,0.35)",
-     "banner": "linear-gradient(120deg, #1E3A8A, #5B21B6, #1E3A8A)",
-     "rojo": "#F87171", "rojo_fondo": "rgba(248,113,113,0.12)",
-     "verde": "#4ADE80", "verde_fondo": "rgba(74,222,128,0.12)"}
+# ---------- estilos ----------
 
 st.markdown(f"""
 <style>
@@ -63,7 +115,53 @@ st.markdown(f"""
 .stApp, .stApp p, .stApp label, .stApp li, .stApp h1, .stApp h2, .stApp h3 {{
     color: {c["texto"]}; font-family: 'Poppins', sans-serif; }}
 [data-testid="stHeader"] {{ background: transparent; }}
-[data-testid="stSidebar"] {{ background: {c["fondo2"]}; border-right: 1px solid {c["borde"]}; }}
+.stApp [data-testid="stCaptionContainer"] p {{ color: {c["suave"]}; }}
+.subtitulo {{ font-weight: 600; margin: 1.2rem 0 0.5rem 0 !important; }}
+.nota {{ font-size: 0.78rem; color: {c["suave"]} !important; margin-top: 0.5rem !important; }}
+
+/* animaciones */
+@keyframes mover {{ 0% {{ background-position: 0% 50%; }} 50% {{ background-position: 100% 50%; }}
+    100% {{ background-position: 0% 50%; }} }}
+@keyframes aparecer {{ from {{ opacity: 0; transform: translateY(14px); }} to {{ opacity: 1; transform: none; }} }}
+@keyframes llenar {{ from {{ width: 0; }} }}
+@keyframes flotar {{ 0%, 100% {{ transform: translateY(0); }} 50% {{ transform: translateY(-8px); }} }}
+
+/* banner del título: degradado en movimiento e ícono */
+.banner {{ display: flex; align-items: center; justify-content: space-between; gap: 1.5rem;
+    background: {c["banner"]}; background-size: 200% 200%; animation: mover 10s ease infinite;
+    border-radius: 20px; padding: 1.8rem 2rem; margin-bottom: 1.5rem; box-shadow: 0 14px 34px {c["brillo"]}; }}
+.banner h1 {{ color: #FFFFFF !important; font-size: 2.1rem; margin: 0; padding: 0; }}
+.banner p {{ color: #E0E7FF !important; margin: 0.4rem 0 0 0; }}
+.banner .etiqueta {{ display: inline-block; font-size: 0.72rem; font-weight: 600; letter-spacing: 1px; color: #E0E7FF;
+    background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.25); border-radius: 999px;
+    padding: 0.15rem 0.7rem; margin-bottom: 0.6rem; }}
+.banner .escudo {{ flex-shrink: 0; width: 92px; height: 92px; animation: flotar 4s ease-in-out infinite;
+    filter: drop-shadow(0 8px 18px rgba(0,0,0,0.35)); }}
+
+/* tarjetas que muestran una explicación al pasar el mouse (cifras de arriba y métricas) */
+.kpis {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem; align-items: start; margin: -0.4rem 0 1.4rem 0; }}
+.metricas {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; align-items: start; }}
+.kpi, .metrica {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 16px;
+    box-shadow: 0 4px 14px {c["sombra"]}; cursor: default; transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s; }}
+.kpi:hover, .metrica:hover {{ transform: translateY(-4px); border-color: {c["principal"]}; box-shadow: 0 12px 26px {c["brillo"]}; }}
+.kpi .info, .metrica .info {{ font-size: 0.72rem; max-height: 0; opacity: 0; overflow: hidden;
+    transition: max-height 0.35s, opacity 0.35s, margin 0.35s; }}
+.kpi:hover .info, .metrica:hover .info {{ max-height: 5rem; opacity: 1; margin-top: 0.4rem; }}
+.kpi {{ padding: 0.9rem 1rem; text-align: center; animation: aparecer 0.6s ease-out both; }}
+.kpi:nth-child(2) {{ animation-delay: 0.1s; }} .kpi:nth-child(3) {{ animation-delay: 0.2s; }} .kpi:nth-child(4) {{ animation-delay: 0.3s; }}
+.kpi .grande {{ font-size: 1.7rem; font-weight: 700; background: linear-gradient(90deg, #60A5FA, #A78BFA);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }}
+.kpi .chico {{ font-size: 0.75rem; color: {c["suave"]}; }}
+.kpi .info {{ color: {c["texto"]}; }}
+.metrica {{ padding: 0.7rem 0.85rem; }}
+.metrica .valor {{ font-size: 1.2rem; font-weight: 700; color: {c["principal"]}; }}
+.metrica .nombre {{ font-size: 0.75rem; color: {c["suave"]}; font-weight: 600; }}
+.metrica .info {{ color: {c["suave"]}; }}
+
+/* pestañas */
+.stTabs [data-baseweb="tab-list"] {{ gap: 0.4rem; }}
+.stTabs [data-baseweb="tab"] {{ background: {c["tarjeta"]}; border-radius: 10px 10px 0 0; padding: 0.4rem 1rem; }}
+.stTabs [data-baseweb="tab"] p {{ font-weight: 600; }}
 
 /* cuadro de texto: se ilumina al escribir */
 .stApp textarea {{ background: {c["tarjeta"]} !important; color: {c["texto"]} !important;
@@ -71,27 +169,21 @@ st.markdown(f"""
     box-shadow: 0 4px 14px {c["sombra"]}; transition: box-shadow 0.25s, border-color 0.25s; }}
 .stApp textarea:focus {{ border-color: {c["principal"]} !important; box-shadow: 0 0 0 4px {c["brillo"]}; }}
 .stApp [data-testid="stTextArea"] > div > div {{ border: none !important; background: transparent !important; }}
-.stApp [data-testid="stCaptionContainer"] p {{ color: {c["suave"]}; }}
+.contador {{ font-size: 0.8rem; color: {c["suave"]} !important; text-align: right; margin-top: -0.6rem !important; }}
 
-/* botón Analizar: sube un poco al pasar el mouse */
+/* botones: Analizar (principal) y ejemplos / Limpiar (secundarios) */
 .stApp button[kind="primary"] {{ background: {c["principal"]}; border: none; border-radius: 12px;
     padding: 0.55rem 1.8rem; box-shadow: 0 6px 16px {c["brillo"]}; transition: transform 0.2s, box-shadow 0.2s; }}
 .stApp button[kind="primary"]:hover {{ transform: translateY(-2px); box-shadow: 0 10px 22px {c["brillo"]}; }}
 .stApp button[kind="primary"]:active {{ transform: scale(0.97); }}
 .stApp button[kind="primary"] p {{ color: {c["texto_boton"]}; font-weight: 600; }}
+.stApp button[kind="secondary"] {{ background: {c["tarjeta"]}; color: {c["texto"]}; border: 1px solid {c["borde"]};
+    border-radius: 999px; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; }}
+.stApp button[kind="secondary"]:hover {{ transform: translateY(-2px); border-color: {c["principal"]};
+    color: {c["principal"]}; box-shadow: 0 6px 14px {c["brillo"]}; }}
+.stApp button[kind="secondary"] p {{ font-size: 0.85rem; }}
 
-/* banner del título con degradado en movimiento */
-@keyframes mover {{ 0% {{ background-position: 0% 50%; }} 50% {{ background-position: 100% 50%; }}
-    100% {{ background-position: 0% 50%; }} }}
-.banner {{ background: {c["banner"]}; background-size: 200% 200%; animation: mover 10s ease infinite;
-    border-radius: 20px; padding: 1.8rem 2rem; margin-bottom: 1.5rem;
-    box-shadow: 0 14px 34px {c["brillo"]}; }}
-.banner h1 {{ color: #FFFFFF !important; font-size: 2.1rem; margin: 0; padding: 0; }}
-.banner p {{ color: #E0E7FF !important; margin: 0.4rem 0 0 0; }}
-
-/* tarjeta del resultado: aparece deslizándose y la barra se llena */
-@keyframes aparecer {{ from {{ opacity: 0; transform: translateY(14px); }} to {{ opacity: 1; transform: none; }} }}
-@keyframes llenar {{ from {{ width: 0; }} }}
+/* resultado: aparece deslizándose y la barra se llena */
 .resultado {{ border-radius: 16px; padding: 1.1rem 1.4rem; margin-top: 1rem; border-left: 6px solid;
     box-shadow: 0 8px 24px {c["sombra"]}; animation: aparecer 0.5s ease-out; }}
 .resultado .clase {{ font-size: 1.6rem; font-weight: 700; letter-spacing: 1px; }}
@@ -101,29 +193,7 @@ st.markdown(f"""
 .umbral {{ position: absolute; left: 50%; top: -4px; width: 2px; height: 20px; background: {c["suave"]}; }}
 .marcas {{ display: flex; justify-content: space-between; font-size: 0.75rem; color: {c["suave"]}; margin-top: 0.3rem; }}
 
-/* tarjetas de métricas: suben y muestran qué significa cada una al pasar el mouse */
-.metricas {{ display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; align-items: start; }}
-.metrica {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px;
-    padding: 0.7rem 0.85rem; box-shadow: 0 3px 10px {c["sombra"]}; cursor: default;
-    transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s; }}
-.metrica:hover {{ transform: translateY(-4px) scale(1.03); border-color: {c["principal"]};
-    box-shadow: 0 12px 24px {c["brillo"]}; }}
-.metrica .valor {{ font-size: 1.2rem; font-weight: 700; color: {c["principal"]}; }}
-.metrica .nombre {{ font-size: 0.75rem; color: {c["suave"]}; font-weight: 600; }}
-.metrica .info {{ font-size: 0.7rem; color: {c["suave"]}; max-height: 0; opacity: 0; overflow: hidden;
-    transition: max-height 0.35s, opacity 0.35s, margin 0.35s; }}
-.metrica:hover .info {{ max-height: 6rem; opacity: 1; margin-top: 0.35rem; }}
-/* botones de ejemplo y botón Limpiar */
-.stApp button[kind="secondary"] {{ background: {c["tarjeta"]}; color: {c["texto"]}; border: 1px solid {c["borde"]};
-    border-radius: 999px; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; }}
-.stApp button[kind="secondary"]:hover {{ transform: translateY(-2px); border-color: {c["principal"]};
-    color: {c["principal"]}; box-shadow: 0 6px 14px {c["brillo"]}; }}
-.stApp button[kind="secondary"] p {{ font-size: 0.85rem; }}
-.subtitulo {{ font-weight: 600; margin: 1.2rem 0 0.5rem 0 !important; }}
-.contador {{ font-size: 0.8rem; color: {c["suave"]} !important; text-align: right; margin-top: -0.6rem !important; }}
-.nota {{ font-size: 0.78rem; color: {c["suave"]} !important; margin-top: 0.5rem !important; }}
-
-/* tarjetas de características del correo */
+/* características del correo */
 .caracts {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; animation: aparecer 0.6s ease-out; }}
 .caract {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; padding: 0.7rem 0.9rem;
     box-shadow: 0 3px 10px {c["sombra"]}; transition: transform 0.25s, border-color 0.25s; }}
@@ -132,9 +202,11 @@ st.markdown(f"""
 .caract .nombre {{ font-size: 0.8rem; font-weight: 600; }}
 .caract .prom {{ font-size: 0.68rem; color: {c["suave"]}; margin-top: 0.2rem; }}
 
-/* texto con palabras resaltadas */
+/* texto analizado y tabla de lo encontrado */
 .texto-marcado {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px;
     padding: 0.9rem 1.1rem; line-height: 1.8; box-shadow: 0 3px 10px {c["sombra"]}; animation: aparecer 0.7s ease-out; }}
+mark.urgencia {{ background: rgba(245,158,11,0.30); color: inherit; border-radius: 4px; padding: 0 3px; }}
+mark.enlace {{ background: rgba(139,92,246,0.25); color: inherit; border-radius: 4px; padding: 0 3px; }}
 .leyenda {{ width: 100%; margin-top: 0.8rem; border-collapse: separate; border-spacing: 0; font-size: 0.85rem;
     background: {c["tarjeta"]}; border: 1px solid {c["principal"]}; border-radius: 14px; overflow: hidden;
     box-shadow: 0 0 0 3px {c["brillo"]}, 0 8px 22px {c["sombra"]}; animation: aparecer 0.8s ease-out; }}
@@ -143,8 +215,8 @@ st.markdown(f"""
 .leyenda td {{ padding: 0.55rem 0.8rem; color: {c["texto"]}; border-top: 1px solid {c["borde"]}; word-break: break-word; }}
 .leyenda tr:hover td {{ background: {c["brillo"]}; }}
 .leyenda .cantidad {{ font-size: 1.1rem; font-weight: 700; color: {c["principal"]}; text-align: center; }}
-mark.urgencia {{ background: rgba(245,158,11,0.30); color: inherit; border-radius: 4px; padding: 0 3px; }}
-mark.enlace {{ background: rgba(139,92,246,0.25); color: inherit; border-radius: 4px; padding: 0 3px; }}
+
+/* historial */
 [data-testid="stExpander"] details {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; }}
 [data-testid="stExpander"] summary {{ background: {c["tarjeta"]} !important; border-radius: 14px; }}
 [data-testid="stExpander"] summary:hover {{ background: {c["borde"]} !important; }}
@@ -153,54 +225,33 @@ table.historial {{ width: 100%; border-collapse: collapse; font-size: 0.85rem; m
 table.historial th {{ text-align: left; color: {c["suave"]}; font-weight: 600; border-bottom: 1px solid {c["borde"]}; padding: 0.4rem; }}
 table.historial td {{ color: {c["texto"]}; border-bottom: 1px solid {c["borde"]}; padding: 0.4rem; }}
 table.historial tr:hover td {{ background: {c["brillo"]}; }}
-@media (max-width: 640px) {{ .caracts {{ grid-template-columns: repeat(2, 1fr); }} }}
+
+/* pestaña "Sobre el modelo" */
+.info-modelo {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; padding: 0.8rem 1rem; line-height: 1.7; }}
 .palabras {{ display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; animation: aparecer 0.6s ease-out; }}
-.col-p {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; padding: 0.9rem 1rem; box-shadow: 0 3px 10px {c["sombra"]}; }}
+.col-p {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; padding: 0.9rem 1rem;
+    box-shadow: 0 3px 10px {c["sombra"]}; }}
 .tit-p {{ font-weight: 700; margin-bottom: 0.6rem; letter-spacing: 0.5px; }}
-.fila-p {{ display: grid; grid-template-columns: 6.5rem 1fr 3rem; align-items: center; gap: 0.5rem; padding: 0.22rem 0.3rem; border-radius: 8px; transition: background 0.2s; }}
+.fila-p {{ display: grid; grid-template-columns: 6.5rem 1fr 3rem; align-items: center; gap: 0.5rem;
+    padding: 0.22rem 0.3rem; border-radius: 8px; transition: background 0.2s; }}
 .fila-p:hover {{ background: {c["brillo"]}; }}
 .pal {{ font-size: 0.85rem; color: {c["texto"]}; font-family: monospace; }}
 .pista {{ height: 10px; background: {c["borde"]}; border-radius: 999px; overflow: hidden; }}
 .llena {{ height: 100%; border-radius: 999px; animation: llenar 1.2s ease-out; }}
 .num {{ font-size: 0.78rem; color: {c["suave"]}; text-align: right; }}
-.leyenda-p {{ margin-top: 0.9rem; padding: 0.7rem 0.9rem; font-size: 0.8rem; color: {c["suave"]}; background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-left: 4px solid {c["principal"]}; border-radius: 10px; }}
-.stTabs [data-baseweb="tab-list"] {{ gap: 0.4rem; }}
-.stTabs [data-baseweb="tab"] {{ background: {c["tarjeta"]}; border-radius: 10px 10px 0 0; padding: 0.4rem 1rem; }}
-.stTabs [data-baseweb="tab"] p {{ font-weight: 600; }}
-@media (max-width: 640px) {{ .palabras {{ grid-template-columns: 1fr; }} }}
-.metricas-3 {{ grid-template-columns: repeat(3, 1fr) !important; }}
-.info-modelo {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; padding: 0.8rem 1rem; line-height: 1.7; }}
-/* banner con ícono */
-.banner {{ display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; position: relative; overflow: hidden; }}
-.banner .escudo {{ flex-shrink: 0; width: 92px; height: 92px; animation: flotar 4s ease-in-out infinite; filter: drop-shadow(0 8px 18px rgba(0,0,0,0.35)); }}
-@keyframes flotar {{ 0%, 100% {{ transform: translateY(0); }} 50% {{ transform: translateY(-8px); }} }}
-.banner .etiqueta {{ display: inline-block; font-size: 0.72rem; font-weight: 600; letter-spacing: 1px; color: #E0E7FF;
-    background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.25); border-radius: 999px; padding: 0.15rem 0.7rem; margin-bottom: 0.6rem; }}
-/* franja de cifras principales */
-.kpis {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem; align-items: start; margin: -0.4rem 0 1.4rem 0; }}
-.kpi {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 16px; padding: 0.9rem 1rem; text-align: center;
-    box-shadow: 0 6px 18px {c["sombra"]}; transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s; animation: aparecer 0.6s ease-out both; }}
-.kpi:nth-child(2) {{ animation-delay: 0.1s; }} .kpi:nth-child(3) {{ animation-delay: 0.2s; }} .kpi:nth-child(4) {{ animation-delay: 0.3s; }}
-.kpi:hover {{ transform: translateY(-4px); border-color: {c["principal"]}; box-shadow: 0 12px 26px {c["brillo"]}; }}
-.kpi .grande {{ font-size: 1.7rem; font-weight: 700; background: linear-gradient(90deg, #60A5FA, #A78BFA);
-    -webkit-background-clip: text; background-clip: text; color: transparent; }}
-.kpi .chico {{ font-size: 0.75rem; color: {c["suave"]}; }}
-.kpi .info {{ font-size: 0.72rem; color: {c["texto"]}; max-height: 0; opacity: 0; overflow: hidden;
-    transition: max-height 0.35s, opacity 0.35s, margin 0.35s; }}
-.kpi:hover .info {{ max-height: 4rem; opacity: 1; margin-top: 0.4rem; }}
-@media (max-width: 640px) {{ .kpis {{ grid-template-columns: repeat(2, 1fr); }} .banner .escudo {{ display: none; }} }}
+.leyenda-p {{ margin-top: 0.9rem; padding: 0.7rem 0.9rem; font-size: 0.8rem; color: {c["suave"]}; background: {c["tarjeta"]};
+    border: 1px solid {c["borde"]}; border-left: 4px solid {c["principal"]}; border-radius: 10px; }}
+
+/* celular */
+@media (max-width: 640px) {{
+    .kpis, .caracts, .metricas {{ grid-template-columns: repeat(2, 1fr); }}
+    .palabras {{ grid-template-columns: 1fr; }}
+    .banner .escudo {{ display: none; }}
+}}
 </style>
 """, unsafe_allow_html=True)
 
-# métricas oficiales
-metricas = [("Accuracy", "0.9766", "Correos bien clasificados en total."),
-            ("Precision", "0.9633", "De los marcados como phishing, cuántos sí lo eran."),
-            ("Recall", "0.9746", "De los phishing reales, cuántos detectó."),
-            ("F1-score", "0.9689", "Equilibrio entre precision y recall."),
-            ("Falsos positivos", "0.0222", "Correos legítimos marcados como phishing."),
-            ("AUC", "0.997", "Qué tan bien separa las dos clases (1 es perfecto).")]
-tarjetas = "".join(f'<div class="metrica"><div class="valor">{v}</div><div class="nombre">{n}</div>'
-                   f'<div class="info">{d}</div></div>' for n, v, d in metricas)
+# ---------- encabezado: banner y cifras principales ----------
 
 st.markdown("""
 <div class="banner">
@@ -224,76 +275,21 @@ st.markdown("""
 
 tab1, tab2 = st.tabs(["Analizar", "Sobre el modelo"])
 
+# ---------- pestaña Analizar ----------
+
 with tab1:
-    # correos de ejemplo (los mismos 6 del punto 6.2 del Colab)
-    EJEMPLOS = {
-        "Reporte (legítimo)": "Hi John, attached is the report for tomorrow's meeting. Let me know if you have any questions. Thanks, Maria",
-        "Almuerzo (legítimo)": "Reminder: the team lunch was moved to Friday at 1 pm. See you there.",
-        "Profesor (legítimo)": "Hello professor, I am sending you the homework for chapter 4. Best regards, Franco",
-        "Cuenta (phishing)": "URGENT: Your account has been suspended! Verify your password immediately at http://paypa1-secure.com/login",
-        "Premio (phishing)": "Congratulations!!! You have won $1,000,000. Click here to claim your prize now: http://free-prize.win",
-        "Banco (phishing)": "Dear customer, we detected unusual activity in your bank account. Please login and confirm your details within 24 hours.",
-    }
-
-    # promedios de cada característica por clase (tabla del punto 3.2 del Colab)
-    CARACTERISTICAS = [  # (columna, nombre, promedio phishing, promedio legítimo)
-        ("n_urls", "Enlaces", 0.292, 0.771),
-        ("n_caracteres", "Caracteres", 1641.607, 1848.656),
-        ("n_palabras", "Palabras", 311.555, 350.052),
-        ("prop_mayus", "Mayúsculas", 0.027, 0.022),
-        ("n_exclam", 'Signos "!"', 3.385, 0.638),
-        ("n_urgencia", "Palabras de urgencia", 1.081, 0.352),
-    ]
-
     if "historial" not in st.session_state:
         st.session_state.historial = []
 
-    def poner_ejemplo(correo):
-        st.session_state.texto = correo
-
-    def limpiar():
-        st.session_state.texto = ""
-
-    def formato(col, valor):
-        if col == "prop_mayus":
-            return f"{valor * 100:.1f} %"
-        if col in ("n_caracteres", "n_palabras"):
-            return f"{valor:.0f}"
-        return f"{valor:g}"
-
-    def resaltar(t):
-        # marca los enlaces y las palabras de urgencia dentro del correo
-        t = html.escape(t)
-        def cambiar(m):
-            tipo = "enlace" if m.group(1) else "urgencia"
-            return f'<mark class="{tipo}">{m.group(0)}</mark>'
-        t = patron_resaltar.sub(cambiar, t)
-        return t.replace("$", "&#36;").replace("\n", "<br>")
-
-    def encontrados(t, patron):
-        # lista lo que encontró el modelo (con la misma regla), sin repetir y con cuántas veces aparece
-        conteo = {}
-        for x in patron.findall(t):
-            clave = x.lower()
-            if clave not in conteo:
-                conteo[clave] = [x, 0]
-            conteo[clave][1] += 1
-        lista = [f"{x} (x{n})" if n > 1 else x for x, n in conteo.values()]
-        return html.escape(", ".join(lista)) if lista else "Ninguno"
-
-    patron_resaltar = re.compile(r"(http\S+|www\.\S+)|\b(" + "|".join(URGENCIA) + r")\b", re.I)
-
-    # 1. botones con correos de ejemplo
+    # botones con correos de ejemplo
     st.markdown('<p class="subtitulo">Prueba con un correo de ejemplo:</p>', unsafe_allow_html=True)
-    with st.container(key="ejemplos"):
-        columnas = st.columns(3)
-        for k, (nombre, correo) in enumerate(EJEMPLOS.items()):
-            columnas[k % 3].button(nombre, on_click=poner_ejemplo, args=(correo,), width="stretch")
+    lista = list(EJEMPLOS.items())
+    for i in range(0, len(lista), 3):          # filas de 3 botones (en celular quedan en orden)
+        for col, (nombre, correo) in zip(st.columns(3), lista[i:i + 3]):
+            col.button(nombre, on_click=poner_ejemplo, args=(correo,), width="stretch")
 
     texto = st.text_area("Texto del correo", height=200, key="texto",
                          placeholder="Pega aquí el texto del correo en inglés...")
-
-    # 4. contador de palabras y caracteres
     st.markdown(f'<p class="contador">{len(texto.split())} palabras &middot; {len(texto)} caracteres</p>',
                 unsafe_allow_html=True)
 
@@ -305,10 +301,10 @@ with tab1:
         if texto.strip() == "":
             st.warning("Primero pega el texto de un correo.")
         else:
-            fila = pd.DataFrame([{"texto_limpio": limpiar_texto(texto), **estructurales(texto)}])
+            valores = estructurales(texto)
+            fila = pd.DataFrame([{"texto_limpio": limpiar_texto(texto), **valores}])
             p = modelo.predict_proba(fila)[0, 1]          # probabilidad de phishing
-            st.session_state.ultimo = {"texto": texto, "p": p}
-            # 5. historial de la sesión
+            st.session_state.ultimo = {"texto": texto, "p": p, "valores": valores}
             nuevo = {"Correo": texto[:50] + ("..." if len(texto) > 50 else ""),
                      "Resultado": "PHISHING" if p >= 0.5 else "LEGÍTIMO",
                      "P(phishing)": f"{p * 100:.1f} %"}
@@ -318,13 +314,20 @@ with tab1:
     # el resultado se muestra mientras el texto no cambie
     ultimo = st.session_state.get("ultimo")
     if ultimo and ultimo["texto"] == texto and texto.strip() != "":
-        p = ultimo["p"]
+        p, valores = ultimo["p"], ultimo["valores"]
         if p >= 0.5:
             clase, color, fondo = "PHISHING", c["rojo"], c["rojo_fondo"]
             detalle = f"PHISHING - probabilidad: {p * 100:.1f} %"
         else:
             clase, color, fondo = "LEGÍTIMO", c["verde"], c["verde_fondo"]
             detalle = f"LEGÍTIMO - probabilidad de phishing: {p * 100:.1f} %"
+
+        cajas = "".join(
+            f'<div class="caract"><div class="valor">{formato(col, valores[col])}</div>'
+            f'<div class="nombre">{nombre}</div>'
+            f'<div class="prom">Promedio: phishing {formato(col, prom_ph)} | legítimo {formato(col, prom_leg)}</div></div>'
+            for col, nombre, prom_ph, prom_leg in CARACTERISTICAS)
+
         st.markdown(f"""
 <div class="resultado" style="background:{fondo}; border-color:{color};">
 <div class="clase" style="color:{color};">{clase}</div>
@@ -332,23 +335,9 @@ with tab1:
 <div class="barra"><div class="relleno" style="width:{p * 100:.1f}%; background:{color};"></div><div class="umbral"></div></div>
 <div class="marcas"><span>0 %</span><span>umbral 50 %</span><span>100 %</span></div>
 </div>
-    """, unsafe_allow_html=True)
-
-        # 2. características del correo comparadas con los promedios del data-set
-        valores = estructurales(texto)
-        cajas = ""
-        for col, nombre, prom_ph, prom_leg in CARACTERISTICAS:
-            cajas += (f'<div class="caract"><div class="valor">{formato(col, valores[col])}</div>'
-                      f'<div class="nombre">{nombre}</div>'
-                      f'<div class="prom">Promedio: phishing {formato(col, prom_ph)} | legítimo {formato(col, prom_leg)}</div></div>')
-        st.markdown(f"""
 <p class="subtitulo">Características del correo</p>
 <div class="caracts">{cajas}</div>
 <p class="nota">El modelo usa estas 6 medidas junto con las palabras del texto (TF-IDF). Debajo de cada una está el promedio de los correos del data-set.</p>
-    """, unsafe_allow_html=True)
-
-        # 3. texto con los enlaces y las palabras de urgencia resaltados
-        st.markdown(f"""
 <p class="subtitulo">Texto analizado</p>
 <div class="texto-marcado">{resaltar(texto)}</div>
 <table class="leyenda">
@@ -356,9 +345,9 @@ with tab1:
 <tr><td><mark class="urgencia">naranja</mark></td><td>Palabras de urgencia</td><td class="cantidad">{valores["n_urgencia"]}</td><td>{encontrados(texto, patron_urg)}</td></tr>
 <tr><td><mark class="enlace">morado</mark></td><td>Enlaces</td><td class="cantidad">{valores["n_urls"]}</td><td>{encontrados(texto, patron_url)}</td></tr>
 </table>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-    # 5. historial de los correos analizados
+    # historial de los correos analizados
     if st.session_state.historial:
         with st.expander(f"Historial de esta sesión ({len(st.session_state.historial)})"):
             filas = "".join(
@@ -371,15 +360,26 @@ with tab1:
                 st.session_state.historial = []
                 st.rerun()
 
+# ---------- pestaña Sobre el modelo ----------
 
 with tab2:
+    tarjetas = "".join(f'<div class="metrica"><div class="valor">{v}</div><div class="nombre">{n}</div>'
+                       f'<div class="info">{d}</div></div>' for n, v, d in METRICAS)
+    phishing, legitimo = palabras_importantes()
+    maximo = max(abs(v) for _, v in phishing + legitimo)
     st.markdown(f"""
 <div class="info-modelo"><b>Data-set:</b> Phishing Email Detection (Kaggle), 17 536 correos después de la limpieza.<br>
 <b>Modelo:</b> regresión logística con TF-IDF (5000 términos) y 6 características del texto.</div>
 <p class="subtitulo">Resultados en la prueba (5 261 correos)</p>
-<div class="metricas metricas-3">{tarjetas}</div>
+<div class="metricas">{tarjetas}</div>
+<p class="subtitulo">Palabras más importantes del modelo</p>
+<p class="nota">Son las palabras con el coeficiente más alto en la regresión logística. Un coeficiente positivo empuja hacia phishing y uno negativo hacia legítimo. Pasa el mouse por una barra para ver su valor.</p>
+<div class="palabras">
+<div class="col-p"><div class="tit-p" style="color:{c["rojo"]};">Más indican PHISHING</div>{barras(phishing, c["rojo"], maximo)}</div>
+<div class="col-p"><div class="tit-p" style="color:{c["verde"]};">Más indican LEGÍTIMO</div>{barras(legitimo, c["verde"], maximo)}</div>
+</div>
+<div class="leyenda-p"><b>Nota:</b> las palabras salen cortadas por el stemming (por ejemplo, "remov" viene de remove y removal). Algunas palabras de legítimo, como "enron", "linguist" o "vinc", aparecen porque muchos correos legítimos del data-set vienen de la empresa Enron y de una lista de lingüística. Es una limitación del data-set: un correo legítimo distinto a esos puede salir como phishing.</div>
 """, unsafe_allow_html=True)
-    seccion_palabras()
 
 st.write("")
 st.caption("Aprendizaje Estadístico - UPAO 2026-II | Eustaquio Ávila, Marquez Rodriguez, Velásquez Revilla")
