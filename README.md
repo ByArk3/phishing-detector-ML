@@ -53,6 +53,7 @@ Matriz de confusión: 3221 verdaderos negativos, 73 falsos positivos, 50 falsos 
 
 ### Enlaces
 - Informe del proyecto: [docs/Informe_Proyecto_Phishing.pdf](docs/Informe_Proyecto_Phishing.pdf)
+- Estructura del proyecto (plantilla del curso): [docs/Plantilla_Proyecto_Aprendizaje_Estadistico.pdf](docs/Plantilla_Proyecto_Aprendizaje_Estadistico.pdf)
 - Colab del proyecto: https://colab.research.google.com/drive/1EVCmeimmvzYhb1KEwd6lxX0e0ZgqGwuv?usp=sharing
 
 ---
@@ -69,6 +70,7 @@ Matriz de confusión: 3221 verdaderos negativos, 73 falsos positivos, 50 falsos 
 | `notebooks/Proyecto_Phishing_Colab.ipynb` | Colab completo: data-set, limpieza, entrenamiento, evaluación y creación de los archivos de la app. |
 | `pruebas/prueba_correos_nuevos.py` | Prueba el modelo guardado con 6 correos nuevos. |
 | `docs/Informe_Proyecto_Phishing.pdf` | Informe del proyecto. |
+| `docs/Plantilla_Proyecto_Aprendizaje_Estadistico.pdf` | Estructura del proyecto que pide el curso (secciones I a VII). |
 
 ---
 
