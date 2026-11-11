@@ -20,17 +20,23 @@ def cambiar_modo():
 
 # colores de cada modo
 if st.session_state.oscuro:
-    c = {"fondo": "#0B1120", "fondo2": "#111A2E", "tarjeta": "#16213A", "borde": "#26324D",
+    c = {"fondo": "radial-gradient(circle at 15% 0%, #1E1B4B 0%, #0B1120 45%)",
+         "fondo2": "linear-gradient(180deg, #111A2E 0%, #0B1120 100%)",
+         "tarjeta": "#16213A", "borde": "#26324D", "sombra": "rgba(0,0,0,0.45)",
          "texto": "#E2E8F0", "suave": "#94A3B8", "principal": "#60A5FA", "texto_boton": "#0B1120",
-         "banner": "linear-gradient(135deg, #1E3A8A 0%, #5B21B6 100%)",
+         "brillo": "rgba(96,165,250,0.35)",
+         "banner": "linear-gradient(120deg, #1E3A8A, #5B21B6, #1E3A8A)",
          "rojo": "#F87171", "rojo_fondo": "rgba(248,113,113,0.12)",
          "verde": "#4ADE80", "verde_fondo": "rgba(74,222,128,0.12)"}
 else:
-    c = {"fondo": "#F4F7FB", "fondo2": "#FFFFFF", "tarjeta": "#FFFFFF", "borde": "#DCE3EE",
+    c = {"fondo": "radial-gradient(circle at 15% 0%, #E0E7FF 0%, #F5F7FF 40%, #FFFFFF 100%)",
+         "fondo2": "linear-gradient(180deg, #EEF2FF 0%, #FFFFFF 100%)",
+         "tarjeta": "#FFFFFF", "borde": "#E0E7FF", "sombra": "rgba(30,64,175,0.10)",
          "texto": "#0F172A", "suave": "#64748B", "principal": "#1D4ED8", "texto_boton": "#FFFFFF",
-         "banner": "linear-gradient(135deg, #1D4ED8 0%, #7C3AED 100%)",
-         "rojo": "#B91C1C", "rojo_fondo": "#FEECEC",
-         "verde": "#15803D", "verde_fondo": "#E9F8EF"}
+         "brillo": "rgba(29,78,216,0.25)",
+         "banner": "linear-gradient(120deg, #1D4ED8, #7C3AED, #1D4ED8)",
+         "rojo": "#B91C1C", "rojo_fondo": "#FEF2F2",
+         "verde": "#15803D", "verde_fondo": "#F0FDF4"}
 
 st.markdown(f"""
 <style>
@@ -40,39 +46,64 @@ st.markdown(f"""
     color: {c["texto"]}; font-family: 'Poppins', sans-serif; }}
 [data-testid="stHeader"] {{ background: transparent; }}
 [data-testid="stSidebar"] {{ background: {c["fondo2"]}; border-right: 1px solid {c["borde"]}; }}
+
+/* cuadro de texto: se ilumina al escribir */
 .stApp textarea {{ background: {c["tarjeta"]} !important; color: {c["texto"]} !important;
-    border: 1px solid {c["borde"]} !important; border-radius: 12px !important; }}
+    border: 1px solid {c["borde"]} !important; border-radius: 14px !important;
+    box-shadow: 0 4px 14px {c["sombra"]}; transition: box-shadow 0.25s, border-color 0.25s; }}
+.stApp textarea:focus {{ border-color: {c["principal"]} !important; box-shadow: 0 0 0 4px {c["brillo"]}; }}
 .stApp [data-testid="stTextArea"] > div > div {{ border: none !important; background: transparent !important; }}
 .stApp [data-testid="stCaptionContainer"] p {{ color: {c["suave"]}; }}
-.stApp button[kind="primary"] {{ background: {c["principal"]}; border: none; border-radius: 10px;
-    padding: 0.5rem 1.6rem; }}
+
+/* botón Analizar: sube un poco al pasar el mouse */
+.stApp button[kind="primary"] {{ background: {c["principal"]}; border: none; border-radius: 12px;
+    padding: 0.55rem 1.8rem; box-shadow: 0 6px 16px {c["brillo"]}; transition: transform 0.2s, box-shadow 0.2s; }}
+.stApp button[kind="primary"]:hover {{ transform: translateY(-2px); box-shadow: 0 10px 22px {c["brillo"]}; }}
+.stApp button[kind="primary"]:active {{ transform: scale(0.97); }}
 .stApp button[kind="primary"] p {{ color: {c["texto_boton"]}; font-weight: 600; }}
 
-/* botón día / noche fijo en la esquina */
+/* botón día / noche fijo en la esquina: el icono gira al pasar el mouse */
 .st-key-boton_modo {{ position: fixed; top: 4rem; right: 1.5rem; z-index: 999999; width: auto; }}
 .st-key-boton_modo button {{ background: {c["tarjeta"]}; color: {c["texto"]};
-    border: 1px solid {c["borde"]}; border-radius: 999px; }}
+    border: 1px solid {c["borde"]}; border-radius: 999px; box-shadow: 0 4px 12px {c["sombra"]};
+    transition: transform 0.2s; }}
+.st-key-boton_modo button:hover {{ transform: scale(1.06); border-color: {c["principal"]}; }}
+.st-key-boton_modo button span {{ transition: transform 0.5s; }}
+.st-key-boton_modo button:hover span {{ transform: rotate(180deg); }}
 
-/* banner del título */
-.banner {{ background: {c["banner"]}; border-radius: 18px; padding: 1.8rem 2rem; margin-bottom: 1.5rem;
-    box-shadow: 0 10px 30px rgba(29,78,216,0.25); }}
+/* banner del título con degradado en movimiento */
+@keyframes mover {{ 0% {{ background-position: 0% 50%; }} 50% {{ background-position: 100% 50%; }}
+    100% {{ background-position: 0% 50%; }} }}
+.banner {{ background: {c["banner"]}; background-size: 200% 200%; animation: mover 10s ease infinite;
+    border-radius: 20px; padding: 1.8rem 2rem; margin-bottom: 1.5rem;
+    box-shadow: 0 14px 34px {c["brillo"]}; }}
 .banner h1 {{ color: #FFFFFF !important; font-size: 2.1rem; margin: 0; padding: 0; }}
 .banner p {{ color: #E0E7FF !important; margin: 0.4rem 0 0 0; }}
 
-/* tarjeta del resultado */
-.resultado {{ border-radius: 14px; padding: 1.1rem 1.4rem; margin-top: 1rem; border-left: 6px solid; }}
+/* tarjeta del resultado: aparece deslizándose y la barra se llena */
+@keyframes aparecer {{ from {{ opacity: 0; transform: translateY(14px); }} to {{ opacity: 1; transform: none; }} }}
+@keyframes llenar {{ from {{ width: 0; }} }}
+.resultado {{ border-radius: 16px; padding: 1.1rem 1.4rem; margin-top: 1rem; border-left: 6px solid;
+    box-shadow: 0 8px 24px {c["sombra"]}; animation: aparecer 0.5s ease-out; }}
 .resultado .clase {{ font-size: 1.6rem; font-weight: 700; letter-spacing: 1px; }}
 .resultado .detalle {{ color: {c["suave"]} !important; margin: 0.2rem 0 0.8rem 0; }}
 .barra {{ position: relative; height: 12px; border-radius: 999px; background: {c["borde"]}; }}
-.relleno {{ height: 100%; border-radius: 999px; }}
+.relleno {{ height: 100%; border-radius: 999px; animation: llenar 1.2s ease-out; }}
 .umbral {{ position: absolute; left: 50%; top: -4px; width: 2px; height: 20px; background: {c["suave"]}; }}
 .marcas {{ display: flex; justify-content: space-between; font-size: 0.75rem; color: {c["suave"]}; margin-top: 0.3rem; }}
 
-/* tarjetas de métricas del panel lateral */
-.metricas {{ display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }}
-.metrica {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 12px; padding: 0.6rem 0.8rem; }}
-.metrica .valor {{ font-size: 1.15rem; font-weight: 700; color: {c["principal"]}; }}
-.metrica .nombre {{ font-size: 0.75rem; color: {c["suave"]}; }}
+/* tarjetas de métricas: suben y muestran qué significa cada una al pasar el mouse */
+.metricas {{ display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; align-items: start; }}
+.metrica {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px;
+    padding: 0.7rem 0.85rem; box-shadow: 0 3px 10px {c["sombra"]}; cursor: default;
+    transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s; }}
+.metrica:hover {{ transform: translateY(-4px) scale(1.03); border-color: {c["principal"]};
+    box-shadow: 0 12px 24px {c["brillo"]}; }}
+.metrica .valor {{ font-size: 1.2rem; font-weight: 700; color: {c["principal"]}; }}
+.metrica .nombre {{ font-size: 0.75rem; color: {c["suave"]}; font-weight: 600; }}
+.metrica .info {{ font-size: 0.7rem; color: {c["suave"]}; max-height: 0; opacity: 0; overflow: hidden;
+    transition: max-height 0.35s, opacity 0.35s, margin 0.35s; }}
+.metrica:hover .info {{ max-height: 6rem; opacity: 1; margin-top: 0.35rem; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -84,15 +115,20 @@ with st.container(key="boton_modo"):
         st.button("Noche", icon=":material/dark_mode:", on_click=cambiar_modo)
 
 # panel lateral con la información del modelo
-metricas = [("Accuracy", "0.9766"), ("Precision", "0.9633"), ("Recall", "0.9746"),
-            ("F1-score", "0.9689"), ("Falsos positivos", "0.0222"), ("AUC", "0.997")]
+metricas = [("Accuracy", "0.9766", "Correos bien clasificados en total."),
+            ("Precision", "0.9633", "De los marcados como phishing, cuántos sí lo eran."),
+            ("Recall", "0.9746", "De los phishing reales, cuántos detectó."),
+            ("F1-score", "0.9689", "Equilibrio entre precision y recall."),
+            ("Falsos positivos", "0.0222", "Correos legítimos marcados como phishing."),
+            ("AUC", "0.997", "Qué tan bien separa las dos clases (1 es perfecto).")]
 with st.sidebar:
     st.header("Sobre el modelo")
     st.write("**Data-set:** Phishing Email Detection (Kaggle), 17 536 correos después de la limpieza.")
     st.write("**Modelo:** regresión logística con TF-IDF (5000 términos) y 6 características del texto.")
     st.write("**Resultados en la prueba (5 261 correos):**")
-    tarjetas = "".join(f'<div class="metrica"><div class="valor">{v}</div><div class="nombre">{n}</div></div>'
-                       for n, v in metricas)
+    st.caption("Pasa el mouse por una tarjeta para ver qué significa.")
+    tarjetas = "".join(f'<div class="metrica"><div class="valor">{v}</div><div class="nombre">{n}</div>'
+                       f'<div class="info">{d}</div></div>' for n, v, d in metricas)
     st.markdown(f'<div class="metricas">{tarjetas}</div>', unsafe_allow_html=True)
 
 st.markdown("""
