@@ -1,22 +1,5 @@
-# Colores de la app en modo día (claro) y modo noche (oscuro).
-# El modo se elige en el menú de la app: ⋮ > Settings > Theme.
-
+# Tema base de la app. El modo día / noche lo maneja el botón de la esquina (app.py).
 [theme]
-font = "sans-serif"
-baseRadius = "medium"
-
-[theme.light]
+base = "light"
 primaryColor = "#1D4ED8"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F1F5F9"
-textColor = "#0F172A"
-redColor = "#B91C1C"
-greenColor = "#15803D"
-
-[theme.dark]
-primaryColor = "#60A5FA"
-backgroundColor = "#0F172A"
-secondaryBackgroundColor = "#1E293B"
-textColor = "#E2E8F0"
-redColor = "#F87171"
-greenColor = "#4ADE80"
+font = "sans-serif"

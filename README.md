@@ -65,7 +65,7 @@ Matriz de confusión: 3221 verdaderos negativos, 73 falsos positivos, 50 falsos 
 | `procesamiento.py` | Funciones de limpieza del texto (`limpiar_texto`) y de las 6 características (`estructurales`), iguales a las del Colab. |
 | `modelo_phishing.joblib` | Modelo ya entrenado en el Colab (TF-IDF + características + regresión logística). |
 | `requirements.txt` | Librerías con las mismas versiones del Colab. |
-| `.streamlit/config.toml` | Colores y tipo de letra de la app. |
+| `.streamlit/config.toml` | Tema base de la app (los colores de día y noche están en `app.py`). |
 | `notebooks/Proyecto_Phishing_Colab.ipynb` | Colab completo: data-set, limpieza, entrenamiento, evaluación y creación de los archivos de la app. |
 | `pruebas/prueba_correos_nuevos.py` | Prueba el modelo guardado con 6 correos nuevos. |
 | `docs/Informe_Proyecto_Phishing.pdf` | Informe del proyecto. |
