@@ -102,6 +102,8 @@ st.markdown(f"""
 /* texto con palabras resaltadas */
 .texto-marcado {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px;
     padding: 0.9rem 1.1rem; line-height: 1.8; box-shadow: 0 3px 10px {c["sombra"]}; animation: aparecer 0.7s ease-out; }}
+.leyenda {{ display: inline-block; margin-top: 0.7rem; padding: 0.5rem 0.9rem; font-size: 0.8rem;
+    color: {c["suave"]}; background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 10px; }}
 mark.urgencia {{ background: rgba(245,158,11,0.30); color: inherit; border-radius: 4px; padding: 0 3px; }}
 mark.enlace {{ background: rgba(139,92,246,0.25); color: inherit; border-radius: 4px; padding: 0 3px; }}
 [data-testid="stExpander"] details {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; }}
@@ -255,8 +257,7 @@ if ultimo and ultimo["texto"] == texto and texto.strip() != "":
     st.markdown(f"""
 <p class="subtitulo">Texto analizado</p>
 <div class="texto-marcado">{resaltar(texto)}</div>
-<p class="nota">Leyenda: <mark class="urgencia">naranja</mark> = palabra de urgencia ({valores["n_urgencia"]} en este correo) &nbsp;|&nbsp; <mark class="enlace">morado</mark> = enlace ({valores["n_urls"]} en este correo)</p>
-<p class="nota">Palabras de urgencia que busca el sistema: {", ".join(URGENCIA)}.</p>
+<div class="leyenda"><mark class="urgencia">naranja</mark> = palabra de urgencia ({valores["n_urgencia"]} en este correo) &nbsp;|&nbsp; <mark class="enlace">morado</mark> = enlace ({valores["n_urls"]} en este correo)</div>
 """, unsafe_allow_html=True)
 
 # 5. historial de los correos analizados
