@@ -18,13 +18,10 @@ c = {"fondo": "radial-gradient(circle at 15% 0%, #1E1B4B 0%, #0B1120 45%)",
      "rojo": "#F87171", "rojo_fondo": "rgba(248,113,113,0.12)",
      "verde": "#4ADE80", "verde_fondo": "rgba(74,222,128,0.12)"}
 
-# métricas oficiales del Colab (conjunto de prueba)
-METRICAS = [("Accuracy", "0.9766", "Correos bien clasificados en total."),
-            ("Precision", "0.9633", "De los marcados como phishing, cuántos sí lo eran."),
+# métricas oficiales del Colab que no están en las cifras de arriba
+METRICAS = [("Precision", "0.9633", "De los marcados como phishing, cuántos sí lo eran."),
             ("Recall", "0.9746", "De los phishing reales, cuántos detectó."),
-            ("F1-score", "0.9689", "Equilibrio entre precision y recall."),
-            ("Falsos positivos", "0.0222", "Correos legítimos marcados como phishing."),
-            ("AUC", "0.997", "Qué tan bien separa las dos clases (1 es perfecto).")]
+            ("Falsos positivos", "0.0222", "Correos legítimos marcados como phishing.")]
 
 # correos de ejemplo (los mismos 6 del punto 6.2 del Colab)
 EJEMPLOS = {
@@ -228,6 +225,16 @@ table.historial tr:hover td {{ background: {c["brillo"]}; }}
 
 /* pestaña "Sobre el modelo" */
 .info-modelo {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; padding: 0.8rem 1rem; line-height: 1.7; }}
+.matriz {{ display: grid; grid-template-columns: 7rem 1fr 1fr; gap: 0.5rem; margin-bottom: 0.7rem; animation: aparecer 0.6s ease-out; }}
+.matriz .eje {{ font-size: 0.78rem; font-weight: 600; color: {c["suave"]}; text-align: center; align-self: end; }}
+.matriz .lado {{ align-self: center; text-align: right; }}
+.celda {{ border-radius: 14px; padding: 0.8rem; text-align: center; border: 1px solid {c["borde"]}; cursor: default;
+    transition: transform 0.25s, box-shadow 0.25s; }}
+.celda:hover {{ transform: translateY(-3px); box-shadow: 0 10px 22px {c["sombra"]}; }}
+.celda b {{ display: block; font-size: 1.6rem; }}
+.celda span {{ font-size: 0.75rem; color: {c["suave"]}; }}
+.celda.bien {{ background: {c["verde_fondo"]}; }} .celda.bien b {{ color: {c["verde"]}; }}
+.celda.mal {{ background: {c["rojo_fondo"]}; }} .celda.mal b {{ color: {c["rojo"]}; }}
 .palabras {{ display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; animation: aparecer 0.6s ease-out; }}
 .col-p {{ background: {c["tarjeta"]}; border: 1px solid {c["borde"]}; border-radius: 14px; padding: 0.9rem 1rem;
     box-shadow: 0 3px 10px {c["sombra"]}; }}
@@ -368,9 +375,18 @@ with tab2:
     phishing, legitimo = palabras_importantes()
     maximo = max(abs(v) for _, v in phishing + legitimo)
     st.markdown(f"""
-<div class="info-modelo"><b>Data-set:</b> Phishing Email Detection (Kaggle), 17 536 correos después de la limpieza.<br>
-<b>Modelo:</b> regresión logística con TF-IDF (5000 términos) y 6 características del texto.</div>
-<p class="subtitulo">Resultados en la prueba (5 261 correos)</p>
+<div class="info-modelo"><b>Data-set:</b> 18 650 correos de Kaggle; quedan 17 536 después de la limpieza: 12 275 para entrenar (70 %) y 5 261 para probar (30 %).<br>
+<b>Modelo:</b> regresión logística con TF-IDF (5000 términos) y 6 características del texto. Validación cruzada de 10 pliegues: accuracy promedio 0.9729.</div>
+<p class="subtitulo">Matriz de confusión (prueba, 5 261 correos)</p>
+<div class="matriz">
+<div></div><div class="eje">Predijo legítimo</div><div class="eje">Predijo phishing</div>
+<div class="eje lado">Era legítimo</div>
+<div class="celda bien" title="Correos legítimos que el modelo dejó pasar bien."><b>3221</b><span>Verdaderos negativos</span></div>
+<div class="celda mal" title="Correos legítimos que el modelo marcó como phishing."><b>73</b><span>Falsos positivos</span></div>
+<div class="eje lado">Era phishing</div>
+<div class="celda mal" title="Correos de phishing que el modelo no detectó."><b>50</b><span>Falsos negativos</span></div>
+<div class="celda bien" title="Correos de phishing que el modelo detectó."><b>1917</b><span>Verdaderos positivos</span></div>
+</div>
 <div class="metricas">{tarjetas}</div>
 <p class="subtitulo">Palabras más importantes del modelo</p>
 <p class="nota">Son las palabras con el coeficiente más alto en la regresión logística. Un coeficiente positivo empuja hacia phishing y uno negativo hacia legítimo. Pasa el mouse por una barra para ver su valor.</p>
