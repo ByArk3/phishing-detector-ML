@@ -54,7 +54,7 @@ Matriz de confusión: 3221 verdaderos negativos, 73 falsos positivos, 50 falsos 
 ### Enlaces
 - Informe del proyecto final: [docs/Proyecto_Final_Aprendizaje_Estadistico.pdf](docs/Proyecto_Final_Aprendizaje_Estadistico.pdf)
 - Estructura del proyecto que pide el curso: [docs/Estructura_Aprendizaje_Estadistico.pdf](docs/Estructura_Aprendizaje_Estadistico.pdf)
-- Colab del proyecto: https://colab.research.google.com/drive/1EVCmeimmvzYhb1KEwd6lxX0e0ZgqGwuv?usp=sharing
+- Colab del proyecto: https://colab.research.google.com/drive/1JDdMEnySxNVQy5KH9g01C3a70GchbpVH?usp=sharing
 
 ---
 
