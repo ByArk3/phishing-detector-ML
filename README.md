@@ -108,3 +108,11 @@ El sistema acierta 5 de 6. El correo "Hello professor..." es legítimo pero sale
 
 ### Aplicación publicada
 La app está publicada en Streamlit Community Cloud: https://detector-phishing-ml.streamlit.app
+
+---
+
+## Pendiente
+
+- Volver a ejecutar el Colab con la partición **70 % entrenamiento, 20 % validación y 10 % prueba** que pidió el docente, y actualizar las cifras de este README y de la app.
+- Entorno de Google Colab que se usará: **Python 3**, acelerador **GPU T4** y versión del entorno **"Última (recomendada)"**.
+- Después de ejecutarlo, revisar que `requirements.txt` tenga las mismas versiones que muestra el Colab (sobre todo `scikit-learn`), porque el modelo solo carga con la versión con la que se entrenó.
