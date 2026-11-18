@@ -63,7 +63,7 @@ Matriz de confusión: 1079 verdaderos negativos, 19 falsos positivos, 13 falsos 
 ### Enlaces
 - Informe del proyecto final: [docs/Proyecto_Final_Aprendizaje_Estadistico.pdf](docs/Proyecto_Final_Aprendizaje_Estadistico.pdf)
 - Estructura del proyecto que pide el curso: [docs/Estructura_Aprendizaje_Estadistico.pdf](docs/Estructura_Aprendizaje_Estadistico.pdf)
-- Colab del proyecto: https://colab.research.google.com/drive/1JDdMEnySxNVQy5KH9g01C3a70GchbpVH?usp=sharing
+- Colab del proyecto: https://colab.research.google.com/github/ByArk3/phishing-detector-ML/blob/main/notebooks/Proyecto_Phishing_Colab.ipynb
 
 ---
 
