@@ -19,9 +19,9 @@ c = {"fondo": "radial-gradient(circle at 15% 0%, #1E1B4B 0%, #0B1120 45%)",
      "verde": "#4ADE80", "verde_fondo": "rgba(74,222,128,0.12)"}
 
 # métricas oficiales del Colab que no están en las cifras de arriba
-METRICAS = [("Precision", "0.9633", "De los marcados como phishing, cuántos sí lo eran."),
-            ("Recall", "0.9746", "De los phishing reales, cuántos detectó."),
-            ("Falsos positivos", "0.0222", "Correos legítimos marcados como phishing.")]
+METRICAS = [("Precision", "0.9713", "De los marcados como phishing, cuántos sí lo eran."),
+            ("Recall", "0.9802", "De los phishing reales, cuántos detectó."),
+            ("Falsos positivos", "0.0173", "Correos legítimos marcados como phishing.")]
 
 # correos de ejemplo (los mismos 6 del punto 6.2 del Colab)
 EJEMPLOS = {
@@ -273,10 +273,10 @@ st.markdown("""
   </svg>
 </div>
 <div class="kpis">
-  <div class="kpi"><div class="grande">97.7 %</div><div class="chico">de aciertos (accuracy)</div><div class="info">Correos bien clasificados en la prueba (5 261 correos).</div></div>
-  <div class="kpi"><div class="grande">0.9689</div><div class="chico">F1-score</div><div class="info">Equilibrio entre precision y recall.</div></div>
-  <div class="kpi"><div class="grande">0.997</div><div class="chico">AUC en la prueba</div><div class="info">Qué tan bien separa las dos clases (1 es perfecto).</div></div>
-  <div class="kpi"><div class="grande">17 536</div><div class="chico">correos del data-set</div><div class="info">70 % para entrenar y 30 % para probar.</div></div>
+  <div class="kpi"><div class="grande">98.2 %</div><div class="chico">de aciertos (accuracy)</div><div class="info">Correos bien clasificados en la prueba (1 754 correos).</div></div>
+  <div class="kpi"><div class="grande">0.9757</div><div class="chico">F1-score</div><div class="info">Equilibrio entre precision y recall.</div></div>
+  <div class="kpi"><div class="grande">0.998</div><div class="chico">AUC en la prueba</div><div class="info">Qué tan bien separa las dos clases (1 es perfecto).</div></div>
+  <div class="kpi"><div class="grande">17 536</div><div class="chico">correos del data-set</div><div class="info">70 % para entrenar, 20 % para validar y 10 % para probar.</div></div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -375,17 +375,17 @@ with tab2:
     phishing, legitimo = palabras_importantes()
     maximo = max(abs(v) for _, v in phishing + legitimo)
     st.markdown(f"""
-<div class="info-modelo"><b>Data-set:</b> 18 650 correos de Kaggle; quedan 17 536 después de la limpieza: 12 275 para entrenar (70 %) y 5 261 para probar (30 %).<br>
-<b>Modelo:</b> regresión logística con TF-IDF (5000 términos) y 6 características del texto. Validación cruzada de 10 pliegues: accuracy promedio 0.9729.</div>
-<p class="subtitulo">Matriz de confusión (prueba, 5 261 correos)</p>
+<div class="info-modelo"><b>Data-set:</b> 18 650 correos de Kaggle; quedan 17 536 después de la limpieza: 12 275 para entrenar (70 %), 3 507 para validar (20 %) y 1 754 para probar (10 %).<br>
+<b>Modelo:</b> regresión logística con TF-IDF (5000 términos) y 6 características del texto. Con la validación se eligió C = 10 entre 0.1, 1 y 10 (F1-score en validación: 0.9734).</div>
+<p class="subtitulo">Matriz de confusión (prueba, 1 754 correos)</p>
 <div class="matriz">
 <div></div><div class="eje">Predijo legítimo</div><div class="eje">Predijo phishing</div>
 <div class="eje lado">Era legítimo</div>
-<div class="celda bien" title="Correos legítimos que el modelo dejó pasar bien."><b>3221</b><span>Verdaderos negativos</span></div>
-<div class="celda mal" title="Correos legítimos que el modelo marcó como phishing."><b>73</b><span>Falsos positivos</span></div>
+<div class="celda bien" title="Correos legítimos que el modelo dejó pasar bien."><b>1079</b><span>Verdaderos negativos</span></div>
+<div class="celda mal" title="Correos legítimos que el modelo marcó como phishing."><b>19</b><span>Falsos positivos</span></div>
 <div class="eje lado">Era phishing</div>
-<div class="celda mal" title="Correos de phishing que el modelo no detectó."><b>50</b><span>Falsos negativos</span></div>
-<div class="celda bien" title="Correos de phishing que el modelo detectó."><b>1917</b><span>Verdaderos positivos</span></div>
+<div class="celda mal" title="Correos de phishing que el modelo no detectó."><b>13</b><span>Falsos negativos</span></div>
+<div class="celda bien" title="Correos de phishing que el modelo detectó."><b>643</b><span>Verdaderos positivos</span></div>
 </div>
 <div class="metricas">{tarjetas}</div>
 <p class="subtitulo">Palabras más importantes del modelo</p>

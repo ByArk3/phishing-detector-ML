@@ -33,23 +33,32 @@ https://www.kaggle.com/datasets/subhajournal/phishingemails
 2. **TF-IDF:** 5000 términos entre unigramas y bigramas.
 3. **6 características estructurales:** número de enlaces, número de caracteres, número de palabras, proporción de mayúsculas, signos de exclamación y palabras de urgencia (urgent, verify, password, etc.).
 4. **Regresión logística** con clases balanceadas.
-5. División 70 % entrenamiento y 30 % prueba (estratificada) y validación cruzada de 10 pliegues.
+5. División estratificada: 70 % entrenamiento (12 275 correos), 20 % validación (3 507) y 10 % prueba (1 754).
+6. Con la validación se eligió el parámetro C de la regresión logística (C = 10).
 
 Si la probabilidad de phishing es mayor o igual a 0.5, el correo se clasifica como PHISHING; si no, como LEGÍTIMO.
 
 ### Resultados principales
-Resultados en el conjunto de prueba (5 261 correos):
+Validación (3 507 correos), para elegir el parámetro C:
+
+| C | Accuracy | Precision | Recall | F1-score |
+|---|---|---|---|---|
+| 0.1 | 0.9549 | 0.9312 | 0.9497 | 0.9403 |
+| 1 | 0.9758 | 0.9616 | 0.9741 | 0.9678 |
+| **10** | **0.9800** | **0.9704** | **0.9764** | **0.9734** |
+
+Resultados en el conjunto de prueba (1 754 correos) con C = 10:
 
 | Métrica | Resultado | Meta |
 |---|---|---|
-| Accuracy | 0.9766 | > 0.90 |
-| Precision | 0.9633 | > 0.90 |
-| Recall | 0.9746 | > 0.90 |
-| F1-score | 0.9689 | > 0.90 |
-| Tasa de falsos positivos | 0.0222 | < 0.05 |
-| AUC | 0.997 | - |
+| Accuracy | 0.9818 | > 0.90 |
+| Precision | 0.9713 | > 0.90 |
+| Recall | 0.9802 | > 0.90 |
+| F1-score | 0.9757 | > 0.90 |
+| Tasa de falsos positivos | 0.0173 | < 0.05 |
+| AUC | 0.998 | - |
 
-Matriz de confusión: 3221 verdaderos negativos, 73 falsos positivos, 50 falsos negativos y 1917 verdaderos positivos.
+Matriz de confusión: 1079 verdaderos negativos, 19 falsos positivos, 13 falsos negativos y 643 verdaderos positivos.
 
 ### Enlaces
 - Informe del proyecto final: [docs/Proyecto_Final_Aprendizaje_Estadistico.pdf](docs/Proyecto_Final_Aprendizaje_Estadistico.pdf)
@@ -97,22 +106,14 @@ Probamos el sistema con 6 correos escritos por nosotros, que no están en el dat
 
 | Correo | Esperado | Predicho | P(phishing) | ¿Acierta? |
 |---|---|---|---|---|
-| Hi John, attached is the report for tomorrow's meeting... | LEGÍTIMO | LEGÍTIMO | 0.0180 | Sí |
-| Reminder: the team lunch was moved to Friday at 1 pm... | LEGÍTIMO | LEGÍTIMO | 0.1379 | Sí |
-| Hello professor, I am sending you the homework for chapter 4... | LEGÍTIMO | PHISHING | 0.7833 | No |
-| URGENT: Your account has been suspended! Verify your password... | PHISHING | PHISHING | 0.7797 | Sí |
-| Congratulations!!! You have won $1,000,000. Click here... | PHISHING | PHISHING | 0.7846 | Sí |
-| Dear customer, we detected unusual activity in your bank account... | PHISHING | PHISHING | 0.8501 | Sí |
+| Hi John, attached is the report for tomorrow's meeting... | LEGÍTIMO | LEGÍTIMO | 0.0010 | Sí |
+| Reminder: the team lunch was moved to Friday at 1 pm... | LEGÍTIMO | LEGÍTIMO | 0.0064 | Sí |
+| Hello professor, I am sending you the homework for chapter 4... | LEGÍTIMO | PHISHING | 0.8648 | No |
+| URGENT: Your account has been suspended! Verify your password... | PHISHING | PHISHING | 0.8584 | Sí |
+| Congratulations!!! You have won $1,000,000. Click here... | PHISHING | PHISHING | 0.8185 | Sí |
+| Dear customer, we detected unusual activity in your bank account... | PHISHING | PHISHING | 0.8317 | Sí |
 
 El sistema acierta 5 de 6. El correo "Hello professor..." es legítimo pero sale como phishing. Lo dejamos tal cual porque es un resultado real del modelo y muestra una de sus limitaciones.
 
 ### Aplicación publicada
 La app está publicada en Streamlit Community Cloud: https://detector-phishing-ml.streamlit.app
-
----
-
-## Pendiente
-
-- Volver a ejecutar el Colab con la partición **70 % entrenamiento, 20 % validación y 10 % prueba** que pidió el docente, y actualizar las cifras de este README y de la app.
-- Entorno de Google Colab que se usará: **Python 3**, acelerador **GPU T4** y versión del entorno **"Última (recomendada)"**.
-- Después de ejecutarlo, revisar que `requirements.txt` tenga las mismas versiones que muestra el Colab (sobre todo `scikit-learn`), porque el modelo solo carga con la versión con la que se entrenó.
